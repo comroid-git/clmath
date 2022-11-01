@@ -50,8 +50,8 @@ public class TestMath
     [Test]
     public void TestPrecedence_2()
     {
-        const string input = "1+2^2";
-        const string output = "5";
+        const string input = "3*2^2";
+        const string output = "15";
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
