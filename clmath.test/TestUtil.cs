@@ -17,8 +17,7 @@ public static class TestUtil
 
         var written = writer.ToString();
         var start = written.IndexOf("=", StringComparison.Ordinal);
-        var offset = Environment.NewLine.Length;
-        var end = written.IndexOf(Environment.NewLine, StringComparison.Ordinal) - offset;
+        var end = written.IndexOf(Environment.NewLine, StringComparison.Ordinal) - 2;
         if (start == -1) Assert.Fail("No output");
         var output = written.Substring(start + 2, end - start);
         return output;
