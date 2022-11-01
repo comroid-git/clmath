@@ -58,7 +58,7 @@ public static class Program
 
     internal static bool AutoEval
     {
-        get => _autoEval; 
+        get => _autoEval;
         set
         {
             _autoEval = value;
@@ -89,20 +89,20 @@ public static class Program
     private static void SaveConfig()
     {
         using var fs = File.OpenWrite(configFile);
-        fs.Write(new[]{(byte) DRG});
+        fs.Write(new[] { (byte)DRG });
         fs.Write(BitConverter.GetBytes(AutoEval));
     }
 
     private static void LoadConfig()
     {
         using var fs = File.OpenRead(configFile);
-        _drg = (CalcMode) Read(fs, 1)[0];
+        _drg = (CalcMode)Read(fs, 1)[0];
         _autoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
     }
 
     private static byte[] Read(Stream s, int len)
     {
-        byte[] buf = new byte[len];
+        var buf = new byte[len];
         if (len != s.Read(buf, 0, len))
             throw new Exception("Invalid Number of bytes was read");
         return buf;
@@ -163,7 +163,8 @@ public static class Program
             else if (args[0] == "solve")
             {
                 var func = CreateArgsFuncs(3, args)[0];
-                CmdSolve(new []{"solve", args[1], args[2]/*, "-v"*/}, new Component {type = Component.Type.Var, arg = args[2]}, func.fx, func.ctx);
+                CmdSolve(new[] { "solve", args[1], args[2] /*, "-v"*/ },
+                    new Component { type = Component.Type.Var, arg = args[2] }, func.fx, func.ctx);
             }
             else
             {
@@ -445,11 +446,13 @@ public static class Program
             Console.WriteLine($"Error: Variable {target} was not found in function");
             return;
         }
+
         if (count > 1)
         {
             Console.WriteLine($"Error: Variable {target} was found more than once");
             return;
         }
+
         var result = new Solver(cmds[^1] == "-v").Solve(func, lhs, target);
         EvalFunc(result);
     }

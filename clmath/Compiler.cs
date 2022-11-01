@@ -316,7 +316,10 @@ public sealed class Component
         }
     }
 
-    public bool HasChildren() => x != null || y != null;
+    public bool HasChildren()
+    {
+        return x != null || y != null;
+    }
 
     public Component Copy(bool? deepCopy = null)
     {
@@ -326,17 +329,18 @@ public sealed class Component
             argsCopy[i] = args![i].Copy(deepCopy);
         var copy = new Component
         {
-            type = this.type,
-            func = this.func,
-            op = this.op,
-            arg = this.arg,
+            type = type,
+            func = func,
+            op = op,
+            arg = arg,
             args = argsCopy
         };
         if (_deepCopy)
         {
-            copy.x = this.x?.Copy(deepCopy);
-            copy.y = this.y?.Copy(deepCopy);
+            copy.x = x?.Copy(deepCopy);
+            copy.y = y?.Copy(deepCopy);
         }
+
         return copy;
     }
 }

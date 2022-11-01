@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using NUnit.Framework;
 
 namespace clmath.test;
@@ -15,7 +13,7 @@ public class TestSolver
 
         Assert.AreEqual(output, TestUtil.SolverTest(input, "x", "y"));
     }
-    
+
     [Test]
     public void TestQuadric()
     {
@@ -33,7 +31,7 @@ public class TestSolver
 
         Assert.AreEqual(output, TestUtil.SolverTest(input, "b", "c"));
     }
-    
+
     [Test]
     public void TestACos()
     {

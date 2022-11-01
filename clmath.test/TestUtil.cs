@@ -22,7 +22,7 @@ public static class TestUtil
         var output = written.Substring(start + 2, end - start);
         return output;
     }
-    
+
     public static string SolverTest(string input, string solveFor, string solveWith)
     {
         var bak = Console.In;

@@ -13,7 +13,7 @@ public class TestMath
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
-    
+
     [Test]
     public void TestRad()
     {
@@ -25,7 +25,7 @@ public class TestMath
         Assert.AreEqual(output, TestUtil.CalcTest(input));
         Program.DRG = bak;
     }
-    
+
     [Test]
     public void TestGrad()
     {
@@ -37,7 +37,7 @@ public class TestMath
         Assert.AreEqual(output, TestUtil.CalcTest(input));
         Program.DRG = bak;
     }
-    
+
     [Test]
     public void TestPrecedence_1()
     {
@@ -46,7 +46,7 @@ public class TestMath
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
-    
+
     [Test]
     public void TestPrecedence_2()
     {

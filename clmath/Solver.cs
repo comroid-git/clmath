@@ -97,6 +97,7 @@ public sealed class Solver
                         default:
                             throw new NotSupportedException($"It is impossible to reduce by operator {rhs.op}");
                     }
+
                     if (_verbose && rhs.op != Component.Operator.Power)
                         Console.WriteLine(reverse ? xCopy : yCopy);
                     rhs = reverse && rhs.op != Component.Operator.Divide ? rhs.y! : rhs.x!;
@@ -167,6 +168,7 @@ public sealed class Solver
                         default:
                             throw new NotImplementedException("Function not implemented: " + rhs.func);
                     }
+
                     rhs = rhs.x!;
                     break;
                 case Component.Type.Root:
@@ -206,7 +208,9 @@ public sealed class Solver
                     throw new NotSupportedException($"It is impossible to reduce by operation {rhs.type}");
             }
         }
-        if (!(rhs.type == Component.Type.Parentheses && rhs.x!.type == Component.Type.Var && (string)rhs.x.arg! == target) 
+
+        if (!(rhs.type == Component.Type.Parentheses && rhs.x!.type == Component.Type.Var &&
+              (string)rhs.x.arg! == target)
             && !(rhs.type == Component.Type.Var && (string)rhs.arg! == target))
             WalkComponent_Rec(ref rhs, ref lhs, target);
     }
