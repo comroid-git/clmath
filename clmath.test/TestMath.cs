@@ -51,7 +51,7 @@ public class TestMath
     public void TestPrecedence_2()
     {
         const string input = "3*2^2";
-        const string output = "15";
+        const string output = "12";
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }

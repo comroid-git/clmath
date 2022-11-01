@@ -61,9 +61,6 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_1().Start.Type switch
             {
-                MathLexer.OP_MUL => Component.Operator.Multiply,
-                MathLexer.OP_DIV => Component.Operator.Divide,
-                MathLexer.OP_MOD => Component.Operator.Modulus,
                 MathLexer.POW => Component.Operator.Power,
                 _ => throw new NotSupportedException(context.op_1().GetText())
             },
@@ -79,9 +76,26 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_2().Start.Type switch
             {
+                MathLexer.OP_MUL => Component.Operator.Multiply,
+                MathLexer.OP_DIV => Component.Operator.Divide,
+                MathLexer.OP_MOD => Component.Operator.Modulus,
+                _ => throw new NotSupportedException(context.op_2().GetText())
+            },
+            x = Visit(context.l),
+            y = Visit(context.r)
+        };
+    }
+
+    public override Component VisitExprOp3(MathParser.ExprOp3Context context)
+    {
+        return new Component
+        {
+            type = Component.Type.Op,
+            op = context.op_3().Start.Type switch
+            {
                 MathLexer.OP_ADD => Component.Operator.Add,
                 MathLexer.OP_SUB => Component.Operator.Subtract,
-                _ => throw new NotSupportedException(context.op_2().GetText())
+                _ => throw new NotSupportedException(context.op_3().GetText())
             },
             x = Visit(context.l),
             y = Visit(context.r)
