@@ -5,11 +5,41 @@ namespace clmath.test;
 [Parallelizable(ParallelScope.None)]
 public class TestMath
 {
+    [SetUp]
+    public void SetUp() => Program.SetUp();
+    
     [Test]
     public void TestSquare()
     {
-        const string input = "4*4";
+        const string input = "4^2";
         const string output = "16";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
+    
+    [Test]
+    public void TestCubic()
+    {
+        const string input = "4^3";
+        const string output = "64";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
+    
+    [Test]
+    public void TestFactorial()
+    {
+        const string input = "5!";
+        const string output = "120";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
+    
+    [Test]
+    public void TestFraction()
+    {
+        const string input = "frac(1)(2)";
+        const string output = "0.5";
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }

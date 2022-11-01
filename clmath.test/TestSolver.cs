@@ -5,6 +5,9 @@ namespace clmath.test;
 [Parallelizable(ParallelScope.None)]
 public class TestSolver
 {
+    [SetUp]
+    public void SetUp() => Program.SetUp();
+
     [Test]
     public void TestSquare()
     {

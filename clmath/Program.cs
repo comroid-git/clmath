@@ -35,7 +35,7 @@ public static class Program
 
     static Program()
     {
-        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+        SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
         if (!File.Exists(constantsFile))
@@ -67,6 +67,8 @@ public static class Program
     }
 
     internal static Dictionary<string, double> constants { get; private set; } = null!;
+
+    public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
     private static void SaveConstants(Dictionary<string, double>? values = null)
     {
