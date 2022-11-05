@@ -61,4 +61,31 @@ public class TestSolver
 
         Assert.AreEqual(output, TestUtil.SolverTest(input, "f", "L"));
     }
+
+    [Test]
+    public void TestAdvanced_3()
+    {
+        const string input = "frac(b+c)(2)*d";
+        const string output = "a/d*2-c";
+
+        Assert.AreEqual(output, TestUtil.SolverTest(input, "b", "a"));
+    }
+
+    [Test]
+    public void TestAdvanced_4()
+    {
+        const string input = "frac(b+c)(2)*d";
+        const string output = "a/d*2-b";
+
+        Assert.AreEqual(output, TestUtil.SolverTest(input, "c", "a"));
+    }
+
+    [Test]
+    public void TestAdvanced_5()
+    {
+        const string input = "frac(b+c)(2)*d";
+        const string output = "a/(b+c)*2";
+
+        Assert.AreEqual(output, TestUtil.SolverTest(input, "d", "a"));
+    }
 }
