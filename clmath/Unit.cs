@@ -1,20 +1,17 @@
 ﻿using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace clmath;
 
-public interface IUnit
+public abstract class AbstractUnit
 {
-    static Unit Multiply(Unit a, Unit b) => a.Products[b];
-    static Unit Divide(Unit a, Unit b) => a.Quotients[b];
+    protected abstract Unit AsUnit();
+    
+    public Unit Multiply(AbstractUnit other) => AsUnit().Products[other.AsUnit()];
+    public Unit Divide(AbstractUnit other) => AsUnit().Quotients[other.AsUnit()];
 }
 
-public interface IUnit<TUnit> : IUnit where TUnit : IUnit
-{
-    TUnit Multiply(TUnit other);
-    TUnit Divide(TUnit other);
-}
-
-public sealed class SiUnit : IUnit<SiUnit>
+public sealed class SiUnit : AbstractUnit
 {
     public readonly SiPrefix Prefix;
     public readonly Unit Unit;
@@ -38,40 +35,63 @@ public sealed class SiUnit : IUnit<SiUnit>
         Unit = unit;
     }
 
-    public SiUnit Multiply(SiUnit other)
-    {
-        if (Prefix != other.Prefix)
-            throw new Exception("Unit Prefixes have to be equal");
-        var output = IUnit<SiUnit>.Multiply(Unit, other.Unit);
-        return new SiUnit(Prefix, output);
-    }
-
-    public SiUnit Divide(SiUnit other)
-    {
-        if (Prefix != other.Prefix)
-            throw new Exception("Unit Prefixes have to be equal");
-        var output = IUnit<SiUnit>.Divide(Unit, other.Unit);
-        return new SiUnit(Prefix, output);
-    }
-
     public override string ToString() => $"{Prefix}{Unit}";
+    protected override Unit AsUnit() => Unit;
 }
 
-public sealed class Unit : IUnit<Unit>
+public sealed class Unit : AbstractUnit
 {
+    private static readonly string DescriptorPattern = "([pq]):\\s(\\w+),(\\w+)"; 
     public static readonly ConcurrentDictionary<string, Unit> values = new();
     public readonly ConcurrentDictionary<Unit, Unit> Products = new();
     public readonly ConcurrentDictionary<Unit, Unit> Quotients = new();
-    public readonly string Id;
+    public string Id { get; }
+    public string DisplayName { get; private set; }
 
     private Unit(string id) => values[Id = id] = this;
 
     public static Unit Get(string id) => values.GetOrAdd(id, id => new Unit(id));
-    
-    public Unit Multiply(Unit other) => IUnit<Unit>.Multiply(this, other);
-    public Unit Divide(Unit other) => IUnit<Unit>.Divide(this, other);
 
     public override string ToString() => Id;
+    protected override Unit AsUnit() => this;
+
+    public static void Load(string file)
+    {
+        if (!File.Exists(file))
+            throw new Exception($"Unit descriptor file {file} does not exist");
+        var fName = new FileInfo(file).Name;
+        var uName = fName.Substring(0, fName.IndexOf(Program.UnitExt, StringComparison.Ordinal));
+        var unit = Get(uName);
+        var i = 0;
+        foreach (var line in File.ReadLines(file))
+        {
+            if (i++ == 0)
+            {
+                unit.DisplayName = line;
+                continue;
+            }
+            if (Regex.Match(line, DescriptorPattern) is not { Success: true } match)
+                throw new Exception("Invalid descriptor: " + line);
+            var other = Get(match.Groups[2].Value);
+            var result = Get(match.Groups[3].Value);
+            switch (match.Groups[1].Value)
+            {
+                case "p":
+                    unit.Products[other] = result;
+                    other.Products[unit] = result;
+                    result.Quotients[other] = unit;
+                    result.Quotients[unit] = other;
+                    break;
+                case "q":
+                    unit.Quotients[other] = result;
+                    unit.Quotients[result] = other;
+                    other.Products[result] = unit;
+                    result.Products[other] = unit;
+                    break;
+                default: throw new Exception("Invalid descriptor: " + line);
+            }
+        }
+    }
 }
 
 public sealed class SiPrefix

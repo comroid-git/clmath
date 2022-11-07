@@ -11,6 +11,7 @@ public static class Program
     private const double factorD2G = 1.111111111;
     private static readonly string FuncExt = ".math";
     private static readonly string ConstExt = ".vars";
+    internal static readonly string UnitExt = ".unit";
 
     private static readonly string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "comroid", "clmath");
@@ -40,12 +41,13 @@ public static class Program
         SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
-        if (!File.Exists(constantsFile))
-            SaveConstants(new Dictionary<string, double>());
         if (!File.Exists(configFile))
             SaveConfig();
-        LoadConstants();
+        if (!File.Exists(constantsFile))
+            SaveConstants(new Dictionary<string, double>());
         LoadConfig();
+        LoadConstants();
+        LoadUnits();
     }
 
     public static CalcMode DRG
@@ -88,6 +90,12 @@ public static class Program
             constants[key] = value;
         foreach (var (key, value) in ConvertValuesFromString(File.ReadAllText(constantsFile)))
             constants[key] = value.Evaluate(null);
+    }
+
+    private static void LoadUnits()
+    {
+        foreach (var unitFile in Directory.EnumerateFiles(dir, $"*{UnitExt}"))
+            Unit.Load(unitFile);
     }
 
     private static void SaveConfig()
@@ -550,7 +558,7 @@ public static class Program
     {
         if (cmds.Length == 1)
         {
-            Console.WriteLine("Error: Listing target unspecified; options are 'funcs', 'constants' and 'stash'");
+            Console.WriteLine("Error: Listing target unspecified; options are 'funcs', 'constants', 'stash' and 'units'");
             return;
         }
 
@@ -561,45 +569,55 @@ public static class Program
                 if (funcs.Length == 0)
                 {
                     Console.WriteLine("No saved functions");
+                    break;
                 }
-                else
-                {
-                    Console.WriteLine("Available functions:");
-                    foreach (var file in funcs)
-                        Console.WriteLine(
-                            $"\t- {file.Name.Substring(0, file.Name.Length - FuncExt.Length)}");
-                }
+                Console.WriteLine("Available functions:");
+                foreach (var file in funcs)
+                    Console.WriteLine(
+                        $"\t- {file.Name.Substring(0, file.Name.Length - FuncExt.Length)}");
 
                 break;
             case "constants" or "const":
                 if (constants.Count == 0)
                 {
                     Console.WriteLine("No available constants");
+                    break;
                 }
-                else
-                {
-                    Console.WriteLine("Available constants:");
-                    foreach (var (key, value) in constants)
-                        Console.WriteLine($"\t{key}\t= {value}");
-                }
+                Console.WriteLine("Available constants:");
+                foreach (var (key, value) in constants)
+                    Console.WriteLine($"\t{key}\t= {value}");
 
                 break;
             case "stash":
                 if (stash.Count == 0)
                 {
                     Console.WriteLine("No functions in stash");
+                    break;
                 }
-                else
+                Console.WriteLine("Stashed Functions:");
+                var i = 0;
+                foreach (var (fx, ctx) in stash)
                 {
-                    Console.WriteLine("Stashed Functions:");
-                    var i = 0;
-                    foreach (var (fx, ctx) in stash)
-                    {
-                        Console.WriteLine($"\tstash[{i++}]\t= {fx}");
-                        ctx.DumpVariables("stash[#]".Length / 8 + 1, false);
-                    }
+                    Console.WriteLine($"\tstash[{i++}]\t= {fx}");
+                    ctx.DumpVariables("stash[#]".Length / 8 + 1, false);
                 }
 
+                break;
+            case "units":
+                if (Unit.values.IsEmpty)
+                {
+                    Console.WriteLine("No units loaded");
+                    break;
+                }
+                Console.WriteLine("Loaded units:");
+                foreach (var unit in Unit.values.Values)
+                {
+                    Console.WriteLine($"\t{unit.DisplayName}");
+                    foreach (var (factor, result) in unit.Products)
+                        Console.WriteLine($"\t\t{unit} = {result} / {factor}");
+                    foreach (var (dividend, result) in unit.Quotients)
+                        Console.WriteLine($"\t\t{unit} = {result} * {dividend}");
+                }
                 break;
             default:
                 Console.WriteLine(
