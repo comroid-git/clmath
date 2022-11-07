@@ -217,9 +217,17 @@ public sealed class Component
             case Type.Num:
                 return (double)arg!;
             case Type.Var:
-                if (Program.constants.TryGetValue((string)arg!, out var val))
+                if (arg is not string name)
+                    throw new Exception("Invalid arg: " + arg);
+                if (name.StartsWith("rng"))
+                    if (name.EndsWith("i"))
+                        return Random.Shared.Next();
+                    else if (name.EndsWith("d"))
+                        return Random.Shared.NextDouble();
+                    else throw new Exception("Invalid random: " + arg);
+                if (Program.constants.TryGetValue(name, out var val))
                     return val;
-                return ctx!.var[(string)arg!].Evaluate(ctx);
+                return ctx!.var[name].Evaluate(ctx);
             case Type.FuncX:
                 switch (func)
                 {

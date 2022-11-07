@@ -27,7 +27,9 @@ public static class Program
     {
         { "pi", Math.PI },
         { "e", Math.E },
-        { "tau", Math.Tau }
+        { "tau", Math.Tau },
+        { "rng_i", double.NaN },
+        { "rng_d", double.NaN }
     };
 
     private static CalcMode _drg = CalcMode.Deg;
