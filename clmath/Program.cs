@@ -38,9 +38,6 @@ public static class Program
     internal static readonly Dictionary<string, UnitPackage> unitPackages = new();
     private static readonly List<string> enabledUnitPacks = new();
 
-    private static CalcMode _drg = CalcMode.Deg;
-    private static bool _autoEval = true;
-
     static Program()
     {
         SetUp();
@@ -59,17 +56,8 @@ public static class Program
         LoadUnits();
     }
 
-    public static CalcMode DRG
-    {
-        get => _drg;
-        set => _drg = value;
-    }
-
-    internal static bool AutoEval
-    {
-        get => _autoEval;
-        set => _autoEval = value;
-    }
+    public static CalcMode DRG { get; set; } = CalcMode.Deg;
+    internal static bool AutoEval { get; set; } = true;
 
     public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
@@ -125,8 +113,8 @@ public static class Program
         using var fs = File.OpenRead(configFile);
         if (ConfigVersion != BitConverter.ToInt32(Read(fs, sizeof(int))))
             return false;
-        _drg = (CalcMode)Read(fs, 1)[0];
-        _autoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
+        DRG = (CalcMode)Read(fs, 1)[0];
+        AutoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
         var enabledPackCount = BitConverter.ToInt32(Read(fs, sizeof(int)));
         for (; enabledPackCount > 0; enabledPackCount--)
         {
