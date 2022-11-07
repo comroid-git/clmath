@@ -12,6 +12,7 @@ public static class Program
     private static readonly string FuncExt = ".math";
     private static readonly string ConstExt = ".vars";
     internal static readonly string UnitExt = ".unit";
+    internal static readonly string UnitPackExt = ".units";
 
     private static readonly string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "comroid", "clmath");
@@ -22,7 +23,6 @@ public static class Program
     private static bool _exiting;
     private static bool _dropAll;
     private static Graph? _graph;
-    private static readonly Stack<(Component func, MathContext ctx)> stash = new();
 
     private static readonly Dictionary<string, double> globalConstants = new()
     {
@@ -32,6 +32,9 @@ public static class Program
         { "rng_i", double.NaN },
         { "rng_d", double.NaN }
     };
+    internal static Dictionary<string, double> constants { get; private set; } = null!;
+    private static readonly Stack<(Component func, MathContext ctx)> stash = new();
+    private static readonly Dictionary<string, UnitPackage> unitPackages = new();
 
     private static CalcMode _drg = CalcMode.Deg;
     private static bool _autoEval = true;
@@ -70,8 +73,6 @@ public static class Program
         }
     }
 
-    internal static Dictionary<string, double> constants { get; private set; } = null!;
-
     public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
     private static void SaveConstants(Dictionary<string, double>? values = null)
@@ -94,8 +95,14 @@ public static class Program
 
     private static void LoadUnits()
     {
-        foreach (var unitFile in Directory.EnumerateFiles(dir, $"*{UnitExt}"))
-            Unit.Load(unitFile);
+        foreach (var pkg in Directory.EnumerateDirectories(dir, $"*{UnitPackExt}"))
+        {
+            var packageName = new DirectoryInfo(pkg).Name.StripExtension(UnitPackExt);
+            var package = new UnitPackage(packageName);
+            foreach (var unitFile in Directory.EnumerateFiles(pkg, $"*{UnitExt}"))
+                package.Load(unitFile);
+            unitPackages[packageName] = package;
+        }
     }
 
     private static void SaveConfig()
@@ -556,9 +563,10 @@ public static class Program
 
     private static void CmdList(string[] cmds)
     {
+        const string options = "'funcs', 'constants', 'stash', 'unitpacks' and 'units <pack>'";
         if (cmds.Length == 1)
         {
-            Console.WriteLine("Error: Listing target unspecified; options are 'funcs', 'constants', 'stash' and 'units'");
+            Console.WriteLine("Error: Listing target unspecified; options are " + options);
             return;
         }
 
@@ -603,14 +611,34 @@ public static class Program
                 }
 
                 break;
+            case "unitpacks" or "unitpackages":
+                var directories = Directory.GetDirectories(dir, $"*{UnitPackExt}");
+                if (directories.Length == 0)
+                {
+                    Console.WriteLine("No unit packages defined");
+                    break;
+                }
+                Console.WriteLine("Available unit packages:");
+                foreach (var pack in directories)
+                {
+                    var packName = new DirectoryInfo(pack).Name.StripExtension(UnitPackExt);
+                    Console.WriteLine($"\t- {packName}");
+                }
+                break;
             case "units":
-                if (Unit.values.IsEmpty)
+                if (IsInvalidArgumentCount(cmds, 3))
+                {
+                    Console.WriteLine("Error: No unit package specified");
+                    break;
+                }
+                var package = unitPackages[cmds[2]];
+                if (package.values.IsEmpty)
                 {
                     Console.WriteLine("No units loaded");
                     break;
                 }
-                Console.WriteLine("Loaded units:");
-                foreach (var unit in Unit.values.Values)
+                Console.WriteLine($"Units in package '{package.Name}':");
+                foreach (var unit in package.values.Values)
                 {
                     Console.WriteLine($"\t{unit.DisplayName}");
                     foreach (var (factor, result) in unit.Products)
@@ -621,7 +649,7 @@ public static class Program
                 break;
             default:
                 Console.WriteLine(
-                    $"Error: Unknown listing target '{cmds[1]}';  options are 'funcs', 'constants' and 'stash'");
+                    $"Error: Unknown listing target '{cmds[1]}';  options are " + options);
                 break;
         }
     }
@@ -802,6 +830,13 @@ public static class Program
             CalcMode.Grad => value / factorD2G,
             _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Invalid Calculation Mode")
         };
+    }
+
+    internal static string StripExtension(this string str, string ext)
+    {
+        if (str.EndsWith(ext))
+            str = str.Substring(0, str.IndexOf(ext, StringComparison.Ordinal));
+        return str;
     }
 }
 
