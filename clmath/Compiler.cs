@@ -5,9 +5,19 @@ namespace clmath;
 
 public class MathCompiler : MathBaseVisitor<Component>
 {
-    public override Component VisitNum(MathParser.NumContext context)
+    public override Component VisitUnit(MathParser.UnitContext? context)
     {
-        return new Component { type = Component.Type.Num, arg = double.Parse(context.GetText()) };
+        return new Component { type = Component.Type.Unit, arg = context?.u?.GetText() };
+    }
+
+    public override Component VisitExprNum(MathParser.ExprNumContext context)
+    {
+        return new Component
+        {
+            type = Component.Type.Num,
+            arg = double.Parse(context.num().GetText()),
+            unitX = VisitUnit(context.u)
+        };
     }
 
     public override Component VisitWord(MathParser.WordContext context)
@@ -15,17 +25,23 @@ public class MathCompiler : MathBaseVisitor<Component>
         return new Component { type = Component.Type.Var, arg = context.GetText() };
     }
 
-    public override Component VisitFrac(MathParser.FracContext context)
+    public override Component VisitExprFrac(MathParser.ExprFracContext context)
     {
-        return new Component { type = Component.Type.Frac, x = Visit(context.x), y = Visit(context.y) };
+        return new Component
+        {
+            type = Component.Type.Frac,
+            x = Visit(context.frac().x),
+            y = Visit(context.frac().y),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitFx(MathParser.FxContext context)
+    public override Component VisitExprFunc(MathParser.ExprFuncContext context)
     {
         return new Component
         {
             type = Component.Type.FuncX,
-            func = context.func().Start.Type switch
+            func = context.fx().func().Start.Type switch
             {
                 MathLexer.SIN => Component.FuncX.Sin,
                 MathLexer.COS => Component.FuncX.Cos,
@@ -38,25 +54,42 @@ public class MathCompiler : MathBaseVisitor<Component>
                 MathLexer.ARCSIN => Component.FuncX.ArcSin,
                 MathLexer.ARCCOS => Component.FuncX.ArcCos,
                 MathLexer.ARCTAN => Component.FuncX.ArcTan,
-                _ => throw new NotSupportedException(context.func().GetText())
+                _ => throw new NotSupportedException(context.fx().func().GetText())
             },
-            x = Visit(context.x)
+            x = Visit(context.fx().x),
+            unitX = VisitUnit(context.u)
         };
     }
 
     public override Component VisitExprFact(MathParser.ExprFactContext context)
     {
-        return new Component { type = Component.Type.Factorial, x = Visit(context.x) };
+        return new Component
+        {
+            type = Component.Type.Factorial,
+            x = Visit(context.x),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitRoot(MathParser.RootContext context)
+    public override Component VisitExprRoot(MathParser.ExprRootContext context)
     {
-        return new Component { type = Component.Type.Root, x = Visit(context.x), y = Visit(context.i) };
+        return new Component
+        {
+            type = Component.Type.Root,
+            x = Visit(context.root().x),
+            y = Visit(context.root().i),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitAbs(MathParser.AbsContext context)
+    public override Component VisitExprAbs(MathParser.ExprAbsContext context)
     {
-        return new Component { type = Component.Type.Abs, x = Visit(context.x) };
+        return new Component
+        {
+            type = Component.Type.Abs,
+            x = Visit(context.abs().x),
+            unitX = VisitUnit(context.u)
+        };
     }
 
     public override Component VisitExprPow(MathParser.ExprPowContext context)
@@ -66,7 +99,8 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = Component.Operator.Power,
             x = Visit(context.x),
-            y = Visit(context.y)
+            y = Visit(context.y),
+            unitX = VisitUnit(context.lu)
         };
     }
 
@@ -83,7 +117,9 @@ public class MathCompiler : MathBaseVisitor<Component>
                 _ => throw new NotSupportedException(context.op_1().GetText())
             },
             x = Visit(context.l),
-            y = Visit(context.r)
+            y = Visit(context.r),
+            unitX = VisitUnit(context.lu),
+            unitY = VisitUnit(context.ru)
         };
     }
 
@@ -99,7 +135,9 @@ public class MathCompiler : MathBaseVisitor<Component>
                 _ => throw new NotSupportedException(context.op_2().GetText())
             },
             x = Visit(context.l),
-            y = Visit(context.r)
+            y = Visit(context.r),
+            unitX = VisitUnit(context.lu),
+            unitY = VisitUnit(context.ru)
         };
     }
 
@@ -118,7 +156,8 @@ public class MathCompiler : MathBaseVisitor<Component>
         return new Component
         {
             type = Component.Type.Parentheses,
-            x = Visit(context.n)
+            x = Visit(context.n),
+            unitX = VisitUnit(context.u)
         };
     }
 
@@ -182,7 +221,8 @@ public sealed class Component
         Eval,
         EvalVar,
         Op,
-        Parentheses
+        Parentheses,
+        Unit
     }
 
     public Type type { get; init; }
@@ -190,8 +230,8 @@ public sealed class Component
     public Operator? op { get; init; }
     public Component? x { get; set; }
     public Component? y { get; set; }
-    public SiUnit? unitX { get; init; }
-    public SiUnit? unitY { get; init; }
+    public Component? unitX { get; init; }
+    public Component? unitY { get; init; }
     public object? arg { get; set; }
     public Component[] args { get; init; }
 
@@ -307,22 +347,23 @@ public sealed class Component
 
     public override string ToString()
     {
+        string str = string.Empty;
         switch (type)
         {
             case Type.Num:
             case Type.Var:
-                return arg!.ToString()!;
+                return arg! + (unitX?.ToString() ?? string.Empty);
             case Type.FuncX:
-                return $"{func.ToString()!.ToLower()}({x})";
+                return $"{func.ToString()!.ToLower()}({x}){unitX?.ToString() ?? string.Empty}";
             case Type.Factorial:
-                return $"{x}!";
+                return $"{x}!{unitX?.ToString() ?? string.Empty}";
             case Type.Root:
                 var n = y?.ToString() ?? "2";
-                return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x})";
+                return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x}){unitX?.ToString() ?? string.Empty}";
             case Type.Abs:
-                return $"|{x}|";
+                return $"|{x}|{unitX?.ToString() ?? string.Empty}";
             case Type.Frac:
-                return $"frac({x})({y})";
+                return $"frac({x})({y}){unitX?.ToString() ?? string.Empty}";
             case Type.Op:
                 var op = this.op switch
                 {
@@ -334,13 +375,15 @@ public sealed class Component
                     Operator.Power => '^',
                     _ => throw new ArgumentOutOfRangeException()
                 };
-                return $"{x}{op}{y}";
+                return $"{x}{unitX?.ToString() ?? string.Empty}{op}{y}{unitY?.ToString() ?? string.Empty}";
             case Type.Eval:
                 return $"${arg}" + (args.Length == 0
                     ? string.Empty
                     : $"{{{string.Join("; ", args.Select(var => $"{var.arg}={var.x}"))}}}");
             case Type.Parentheses:
-                return $"({x})";
+                return $"({x}){unitX?.ToString() ?? string.Empty}";
+            case Type.Unit:
+                return $"[{arg}]";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type));
         }
