@@ -59,6 +59,17 @@ public class MathCompiler : MathBaseVisitor<Component>
         return new Component { type = Component.Type.Abs, x = Visit(context.x) };
     }
 
+    public override Component VisitExprPow(MathParser.ExprPowContext context)
+    {
+        return new Component
+        {
+            type = Component.Type.Op,
+            op = Component.Operator.Power,
+            x = Visit(context.x),
+            y = Visit(context.y)
+        };
+    }
+
     public override Component VisitExprOp1(MathParser.ExprOp1Context context)
     {
         return new Component
@@ -66,7 +77,9 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_1().Start.Type switch
             {
-                MathLexer.POW => Component.Operator.Power,
+                MathLexer.OP_MUL => Component.Operator.Multiply,
+                MathLexer.OP_DIV => Component.Operator.Divide,
+                MathLexer.OP_MOD => Component.Operator.Modulus,
                 _ => throw new NotSupportedException(context.op_1().GetText())
             },
             x = Visit(context.l),
@@ -81,26 +94,9 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_2().Start.Type switch
             {
-                MathLexer.OP_MUL => Component.Operator.Multiply,
-                MathLexer.OP_DIV => Component.Operator.Divide,
-                MathLexer.OP_MOD => Component.Operator.Modulus,
-                _ => throw new NotSupportedException(context.op_2().GetText())
-            },
-            x = Visit(context.l),
-            y = Visit(context.r)
-        };
-    }
-
-    public override Component VisitExprOp3(MathParser.ExprOp3Context context)
-    {
-        return new Component
-        {
-            type = Component.Type.Op,
-            op = context.op_3().Start.Type switch
-            {
                 MathLexer.OP_ADD => Component.Operator.Add,
                 MathLexer.OP_SUB => Component.Operator.Subtract,
-                _ => throw new NotSupportedException(context.op_3().GetText())
+                _ => throw new NotSupportedException(context.op_2().GetText())
             },
             x = Visit(context.l),
             y = Visit(context.r)
@@ -194,6 +190,8 @@ public sealed class Component
     public Operator? op { get; init; }
     public Component? x { get; set; }
     public Component? y { get; set; }
+    public SiUnit? unitX { get; init; }
+    public SiUnit? unitY { get; init; }
     public object? arg { get; set; }
     public Component[] args { get; init; }
 
