@@ -48,6 +48,7 @@ DOT: '.' | ',';
 SEMICOLON: ';';
 DOLLAR: '$';
 EQUALS: '=';
+ABS: '|';
 DIGIT: [0-9];
 num: OP_SUB? DIGIT+ (DOT DIGIT+)?;
 CHAR: [a-zA-Z_];
@@ -76,6 +77,7 @@ op_3
 frac: FRAC PAR_L x=expr PAR_R PAR_L y=expr PAR_R;
 fx: func PAR_L x=expr PAR_R;
 root: ROOT i=idxExpr? PAR_L x=expr PAR_R;
+abs: ABS x=expr ABS;
 
 // expressions
 expr
@@ -86,6 +88,7 @@ expr
     | fx                    #exprFunc
     | x=expr FACTORIAL      #exprFact
     | root                  #exprRoot
+    | abs                   #exprAbs
     | num                   #exprNum
     | word                  #exprId
     | eval                  #exprEval
