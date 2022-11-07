@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
@@ -34,7 +35,8 @@ public static class Program
     };
     internal static Dictionary<string, double> constants { get; private set; } = null!;
     private static readonly Stack<(Component func, MathContext ctx)> stash = new();
-    private static readonly Dictionary<string, UnitPackage> unitPackages = new();
+    internal static readonly Dictionary<string, UnitPackage> unitPackages = new();
+    private static readonly List<string> enabledUnitPacks = new();
 
     private static CalcMode _drg = CalcMode.Deg;
     private static bool _autoEval = true;
@@ -48,7 +50,11 @@ public static class Program
             SaveConfig();
         if (!File.Exists(constantsFile))
             SaveConstants(new Dictionary<string, double>());
-        LoadConfig();
+        if (!LoadConfig())
+        {
+            File.Delete(configFile);
+            SaveConfig();
+        } 
         LoadConstants();
         LoadUnits();
     }
@@ -56,21 +62,13 @@ public static class Program
     public static CalcMode DRG
     {
         get => _drg;
-        set
-        {
-            _drg = value;
-            SaveConfig();
-        }
+        set => _drg = value;
     }
 
     internal static bool AutoEval
     {
         get => _autoEval;
-        set
-        {
-            _autoEval = value;
-            SaveConfig();
-        }
+        set => _autoEval = value;
     }
 
     public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
@@ -104,26 +102,45 @@ public static class Program
             unitPackages[packageName] = package;
         }
     }
+    
+    private const int ConfigVersion = 10;
 
     private static void SaveConfig()
     {
         using var fs = File.OpenWrite(configFile);
+        fs.Write(BitConverter.GetBytes(ConfigVersion));
         fs.Write(new[] { (byte)DRG });
         fs.Write(BitConverter.GetBytes(AutoEval));
+        fs.Write(BitConverter.GetBytes(enabledUnitPacks.Count));
+        foreach (var pack in enabledUnitPacks)
+        {
+            var buffer = Encoding.ASCII.GetBytes(pack);
+            fs.Write(BitConverter.GetBytes(buffer.Length));
+            fs.Write(buffer);
+        }
     }
 
-    private static void LoadConfig()
+    private static bool LoadConfig()
     {
         using var fs = File.OpenRead(configFile);
+        if (ConfigVersion != BitConverter.ToInt32(Read(fs, sizeof(int))))
+            return false;
         _drg = (CalcMode)Read(fs, 1)[0];
         _autoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
+        var enabledPackCount = BitConverter.ToInt32(Read(fs, sizeof(int)));
+        for (; enabledPackCount > 0; enabledPackCount--)
+        {
+            var len = BitConverter.ToInt32(Read(fs, sizeof(int)));
+            enabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
+        }
+        return true;
     }
 
     private static byte[] Read(Stream s, int len)
     {
         var buf = new byte[len];
         if (len != s.Read(buf, 0, len))
-            throw new Exception("Invalid Number of bytes was read");
+            return new byte[len];
         return buf;
     }
 
@@ -196,6 +213,7 @@ public static class Program
             }
         }
 
+        SaveConfig();
         _exiting = false;
     }
 
@@ -230,6 +248,8 @@ public static class Program
                     Console.WriteLine("\tset <const>\t\t\tDefines a constant");
                     Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
                     Console.WriteLine("\tlist <target>\t\t\tLists things");
+                    Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
+                    Console.WriteLine("\tdisable <target>\t\t\tDisables the specified unit package");
                     Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
                     Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
                     Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
@@ -248,6 +268,9 @@ public static class Program
                     break;
                 case "list":
                     CmdList(cmds);
+                    break;
+                case "enable" or "disable":
+                    CmdToggleState(cmds, cmds[0] == "enable");
                     break;
                 case "load":
                     CmdLoad(cmds);
@@ -286,7 +309,7 @@ public static class Program
         return args.ToList()
             .GetRange(start, args.Length - start)
             .Select(ParseFunc)
-            .Select(fx => (fx, new MathContext()))
+            .Select(fx => (fx, new MathContext(){enabledUnitPacks = enabledUnitPacks}))
             .ToArray();
     }
 
@@ -305,11 +328,11 @@ public static class Program
         if (lnb != -1)
         {
             var vars = ConvertValuesFromString(data.Substring(lnb + 1, data.Length - lnb - 2));
-            ctx = new MathContext(vars);
+            ctx = new MathContext(vars, enabledUnitPacks);
         }
         else
         {
-            ctx = new MathContext();
+            ctx = new MathContext(){enabledUnitPacks = enabledUnitPacks};
         }
 
         return (ParseFunc(lnb == -1 ? data : data.Substring(0, lnb)), ctx);
@@ -320,7 +343,7 @@ public static class Program
         if (arr.Length < min)
         {
             Console.WriteLine(
-                $"Error: Not enough arguments; requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
+                $"Error: Not enough arguments; '{arr[0]}' requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
             return true;
         }
 
@@ -352,7 +375,7 @@ public static class Program
         else
         {
             // enter editor mode
-            ctx ??= new MathContext();
+            ctx ??= new MathContext(){enabledUnitPacks = enabledUnitPacks};
             while (true)
             {
                 if (_exiting || _dropAll)
@@ -563,7 +586,7 @@ public static class Program
 
     private static void CmdList(string[] cmds)
     {
-        const string options = "'funcs', 'constants', 'stash', 'unitpacks' and 'units <pack>'";
+        const string options = "'funcs', 'constants', 'stash', 'enabled', 'packs' and 'units <pack>'";
         if (cmds.Length == 1)
         {
             Console.WriteLine("Error: Listing target unspecified; options are " + options);
@@ -611,7 +634,17 @@ public static class Program
                 }
 
                 break;
-            case "unitpacks" or "unitpackages":
+            case "enabled":
+                if (enabledUnitPacks.Count == 0)
+                {
+                    Console.WriteLine("No unit packs are enabled");
+                    break;
+                }
+                Console.WriteLine("Enabled unit packs:");
+                foreach (var pack in enabledUnitPacks) 
+                    Console.WriteLine($"\t- {pack}");
+                break;
+            case "packs":
                 var directories = Directory.GetDirectories(dir, $"*{UnitPackExt}");
                 if (directories.Length == 0)
                 {
@@ -627,10 +660,7 @@ public static class Program
                 break;
             case "units":
                 if (IsInvalidArgumentCount(cmds, 3))
-                {
-                    Console.WriteLine("Error: No unit package specified");
                     break;
-                }
                 var package = unitPackages[cmds[2]];
                 if (package.values.IsEmpty)
                 {
@@ -652,6 +682,27 @@ public static class Program
                     $"Error: Unknown listing target '{cmds[1]}';  options are " + options);
                 break;
         }
+    }
+
+    private static void CmdToggleState(string[] cmds, bool newState)
+    {
+        if (IsInvalidArgumentCount(cmds, 2))
+            return;
+        var desiredPack = cmds[1];
+        if (!unitPackages.ContainsKey(desiredPack))
+        {
+            Console.WriteLine($"Unit pack {desiredPack} does not exist");
+            return;
+        }
+        if (newState == enabledUnitPacks.Contains(desiredPack))
+        {
+            Console.WriteLine($"Unit pack {desiredPack} is already " + (newState ? "enabled" : "disabled"));
+            return;
+        }
+        if (newState)
+            enabledUnitPacks.Add(desiredPack);
+        else enabledUnitPacks.Remove(desiredPack);
+        Console.WriteLine($"Unit pack {desiredPack} now " + (newState ? "enabled" : "disabled"));
     }
 
     private static void CmdLoad(string[] cmds)
@@ -850,19 +901,23 @@ public enum CalcMode : byte
 public sealed class MathContext
 {
     public readonly Dictionary<string, Component> var = new();
+    public List<string> enabledUnitPacks { get; init; }= new();
 
-    public MathContext() : this((MathContext?)null)
+    public MathContext() : this(null)
     {
     }
 
-    public MathContext(MathContext? copy) : this(copy?.var)
+    public MathContext(MathContext? copy) : this(copy?.var, copy?.enabledUnitPacks)
     {
     }
 
-    public MathContext(Dictionary<string, Component>? copy)
+    public MathContext(Dictionary<string, Component>? copy, List<string>? enabledUnitPacks)
     {
         if (copy != null)
             foreach (var (key, value) in copy)
                 var[key] = value;
+        if (enabledUnitPacks != null)
+            foreach (var pack in enabledUnitPacks)
+                this.enabledUnitPacks.Add(pack);
     }
 }
