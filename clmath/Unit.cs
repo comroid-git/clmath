@@ -47,16 +47,57 @@ public sealed class SiPrefix
     public override string ToString() => Id;
 }
 
+public sealed class UnitResult
+{
+    public readonly SiUnit Unit;
+    public readonly double Value;
+
+    public UnitResult(double value) : this(SiUnit.None, value)
+    {
+    }
+
+    public UnitResult(SiUnit? unit, double value)
+    {
+        Unit = unit ?? SiUnit.None;
+        Value = value;
+    }
+
+    public static UnitResult operator *(UnitResult left, UnitResult right)
+    {
+        var si1 = right.Unit.Prefix;
+        var value = left.Unit.Prefix.Convert(si1, left.Value);
+        value *= right.Unit.Prefix.Convert(si1, right.Value);
+        var unit = new SiUnit(si1, left.Unit.Multiply(right.Unit));
+        //todo find good common unit prefix and convert to it
+        var si2 = si1;
+        return new UnitResult(unit, si1.Convert(si2, value));
+    }
+
+    public static UnitResult operator /(UnitResult left, UnitResult right)
+    {
+        var si1 = right.Unit.Prefix;
+        var value = left.Unit.Prefix.Convert(si1, left.Value);
+        value /= right.Unit.Prefix.Convert(si1, right.Value);
+        var unit = new SiUnit(si1, left.Unit.Divide(right.Unit));
+        //todo find good common unit prefix and convert to it
+        var si2 = si1;
+        return new UnitResult(unit, si1.Convert(si2, value));
+    }
+
+    public override string ToString() => $"{Value}[{Unit?.ToString() ?? string.Empty}]";
+}
+
 public abstract class AbstractUnit
 {
     protected abstract Unit AsUnit();
     
-    public Unit Multiply(AbstractUnit other) => AsUnit().Products[other.AsUnit()];
-    public Unit Divide(AbstractUnit other) => AsUnit().Quotients[other.AsUnit()];
+    public Unit Multiply(AbstractUnit other) => AsUnit() == Unit.None ? Unit.None : AsUnit().Products[other.AsUnit()];
+    public Unit Divide(AbstractUnit other) => AsUnit() == Unit.None ? Unit.None : AsUnit().Quotients[other.AsUnit()];
 }
 
 public sealed class SiUnit : AbstractUnit
 {
+    public static readonly SiUnit None = new(SiPrefix.None, Unit.None);
     public readonly SiPrefix Prefix;
     public readonly Unit Unit;
 
@@ -74,7 +115,7 @@ public sealed class SiUnit : AbstractUnit
                ?? throw new Exception("No unit found with identifier " + str);
     }
 
-    private SiUnit(SiPrefix prefix, Unit unit)
+    internal SiUnit(SiPrefix prefix, Unit unit)
     {
         Prefix = prefix;
         Unit = unit;
@@ -86,6 +127,7 @@ public sealed class SiUnit : AbstractUnit
 
 public sealed class Unit : AbstractUnit
 {
+    public static readonly Unit None = new(UnitPackage.None, string.Empty);
     public readonly ConcurrentDictionary<Unit, Unit> Products = new();
     public readonly ConcurrentDictionary<Unit, Unit> Quotients = new();
     public string Id { get; }
@@ -99,6 +141,7 @@ public sealed class Unit : AbstractUnit
 
 public sealed class UnitPackage
 {
+    public static readonly UnitPackage None = new(string.Empty);
     public string Name { get; }
     private static readonly string DescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
     public readonly ConcurrentDictionary<string, Unit> values = new();
@@ -147,4 +190,6 @@ public sealed class UnitPackage
             }
         }
     }
+
+    public override string ToString() => Name;
 }

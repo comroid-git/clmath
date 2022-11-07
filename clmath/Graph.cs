@@ -203,7 +203,7 @@ public sealed class Graph : IDisposable
             for (x[i].arg = -scaleX; (double)x[i].arg! < lim; x[i].arg = (double)x[i].arg! + step)
             {
                 var y = fx[i].Evaluate(ctx[i]);
-                curve.Add(new Vector2D<double>((double)x[i].arg!, y));
+                curve.Add(new Vector2D<double>((double)x[i].arg!, y.Value));
             }
 
             var curve_verts = curve.SelectMany(v => new[] { v.X / scaleX, v.Y / scaleY }).ToArray();

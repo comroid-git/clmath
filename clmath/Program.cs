@@ -76,7 +76,7 @@ public static class Program
         foreach (var (key, value) in globalConstants)
             constants[key] = value;
         foreach (var (key, value) in ConvertValuesFromString(File.ReadAllText(constantsFile)))
-            constants[key] = value.Evaluate(null);
+            constants[key] = value.Evaluate(null).Value; // todo: use UnitResult in constants?
     }
 
     private static void LoadUnits()
@@ -357,7 +357,7 @@ public static class Program
     {
         if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
         {
-            var res = func.Evaluate(null);
+            var res = func.Evaluate(new MathContext(){enabledUnitPacks = enabledUnitPacks});
             PrintResult(func, res);
         }
         else
@@ -548,7 +548,7 @@ public static class Program
             return;
         }
 
-        constants[setConst.key] = setConst.value.Evaluate(null);
+        constants[setConst.key] = setConst.value.Evaluate(null).Value; // todo use UnitResult in constants?
         SaveConstants();
     }
 
@@ -841,12 +841,12 @@ public static class Program
         return maxAlign;
     }
 
-    private static void PrintResult(Component func, double res, MathContext? ctx = null)
+    private static void PrintResult(Component func, UnitResult result, MathContext? ctx = null)
     {
         var funcAlign = func.ToString().Length / 8 + 1;
         var align = Math.Max(1, (ctx?.DumpVariables(funcAlign) ?? 1) - funcAlign);
         var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-        Console.WriteLine($"\t{func}{spacer}= {res}");
+        Console.WriteLine($"\t{func}{spacer}= {result}");
     }
 
     internal static double IntoDRG(double value)
@@ -908,4 +908,9 @@ public sealed class MathContext
             foreach (var pack in enabledUnitPacks)
                 this.enabledUnitPacks.Add(pack);
     }
+
+    public UnitPackage[] GetUnitPackages() => Program.unitPackages
+        .Where(pkg => enabledUnitPacks.Contains(pkg.Key))
+        .Select(pkg => pkg.Value)
+        .ToArray();
 }

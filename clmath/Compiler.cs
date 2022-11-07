@@ -252,86 +252,93 @@ public sealed class Component
         return vars;
     }
 
-    public double Evaluate(MathContext? ctx)
+    public UnitResult Evaluate(MathContext? ctx)
     {
         var x = this.x?.Evaluate(ctx);
         var y = this.y?.Evaluate(ctx);
         switch (type)
         {
             case Type.Num:
-                return (double)arg!;
+                return new UnitResult(unitX?.ToUnit(ctx!), (double)arg!);
             case Type.Var:
                 if (arg is not string name)
                     throw new Exception("Invalid arg: " + arg);
                 if (name.StartsWith("rng"))
                     if (name.EndsWith("i"))
-                        return Random.Shared.Next();
+                        return new UnitResult(Random.Shared.Next());
                     else if (name.EndsWith("d"))
-                        return Random.Shared.NextDouble();
+                        return new UnitResult(Random.Shared.NextDouble());
                     else throw new Exception("Invalid random: " + arg);
                 if (Program.constants.TryGetValue(name, out var val))
-                    return val;
+                    return new UnitResult(val);
                 return ctx!.var[name].Evaluate(ctx);
             case Type.FuncX:
+                double result;
                 switch (func)
                 {
                     case FuncX.Sin:
-                        return Math.Sin(Program.IntoDRG(x!.Value));
+                        result = Math.Sin(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Cos:
-                        return Math.Cos(Program.IntoDRG(x!.Value));
+                        result = Math.Cos(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Tan:
-                        return Math.Tan(Program.IntoDRG(x!.Value));
+                        result = Math.Tan(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Log:
-                        return Math.Log(x!.Value);
+                        result = Math.Log(x!.Value);
+                        break;
                     case FuncX.Sec:
                     case FuncX.Csc:
                     case FuncX.Cot:
                     case FuncX.Hyp:
                         throw new NotImplementedException(func.ToString());
                     case FuncX.ArcSin:
-                        return Program.FromDRG(Math.Asin(x!.Value));
+                        result = Program.FromDRG(Math.Asin(x!.Value));
+                        break;
                     case FuncX.ArcCos:
-                        return Program.FromDRG(Math.Acos(x!.Value));
+                        result = Program.FromDRG(Math.Acos(x!.Value));
+                        break;
                     case FuncX.ArcTan:
-                        return Program.FromDRG(Math.Atan(x!.Value));
-                    case null: throw new Exception("invalid state");
+                        result = Program.FromDRG(Math.Atan(x!.Value));
+                        break;
+                    default: throw new Exception("invalid state");
                 }
-
-                break;
+                return new UnitResult(unitX?.ToUnit(ctx!), result);
             case Type.Factorial:
                 var yield = 1;
                 for (var rem = (int)x!.Value; rem > 0; rem--)
                     yield *= rem;
-                return yield;
+                return new UnitResult(unitX?.ToUnit(ctx!), yield);
             case Type.Root:
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                return Math.Pow(x!.Value, 1 / (y ?? 2d));
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, 1 / (y?.Value ?? 2d)));
             case Type.Abs:
-                return Math.Abs(x!.Value);
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Abs(x!.Value));
             case Type.Frac:
-                return x!.Value / y!.Value;
+                return x! / y!;
             case Type.Op:
                 switch (op)
                 {
                     case Operator.Add:
-                        return x!.Value + y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value + y!.Value);
                     case Operator.Subtract:
-                        return x!.Value - y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value - y!.Value);
                     case Operator.Multiply:
-                        return x!.Value * y!.Value;
+                        return x! * y!;
                     case Operator.Divide:
-                        return x!.Value / y!.Value;
+                        return x! / y!;
                     case Operator.Modulus:
-                        return x!.Value % y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value % y!.Value);
                     case Operator.Power:
-                        return Math.Pow(x!.Value, y!.Value);
+                        return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, y!.Value));
                     case null: throw new Exception("invalid state");
                 }
 
                 break;
             case Type.Eval:
                 if (Program.LoadFunc(arg!.ToString()!) is not { } res)
-                    return double.NaN;
+                    return new UnitResult(unitX?.ToUnit(ctx!), double.NaN);
                 var subCtx = new MathContext(res.ctx);
                 foreach (var (key, value) in ctx!.var)
                     subCtx.var[key] = value;
@@ -339,11 +346,13 @@ public sealed class Component
                     subCtx.var[var.arg!.ToString()!] = var.x!;
                 return res.func.Evaluate(subCtx);
             case Type.Parentheses:
-                return x!.Value;
+                return new UnitResult(unitX?.ToUnit(ctx!), x!.Value);
         }
 
         throw new NotSupportedException(ToString());
     }
+
+    private SiUnit? ToUnit(MathContext? ctx) => ctx == null ? null : new((string)arg!, ctx.GetUnitPackages());
 
     public override string ToString()
     {
@@ -375,7 +384,7 @@ public sealed class Component
                     Operator.Power => '^',
                     _ => throw new ArgumentOutOfRangeException()
                 };
-                return $"{x}{unitX?.ToString() ?? string.Empty}{op}{y}{unitY?.ToString() ?? string.Empty}";
+                return $"{x}{op}{y}";
             case Type.Eval:
                 return $"${arg}" + (args.Length == 0
                     ? string.Empty
@@ -383,7 +392,7 @@ public sealed class Component
             case Type.Parentheses:
                 return $"({x}){unitX?.ToString() ?? string.Empty}";
             case Type.Unit:
-                return $"[{arg}]";
+                return (string)arg! == string.Empty ? string.Empty : $"[{arg}]";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type));
         }
