@@ -20,4 +20,22 @@ public sealed class TestUnit
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
+
+    [Test]
+    public void TestSimpleDivide_1()
+    {
+        const string input = "3680[W]/16[A]";
+        const string output = "230[V]";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
+
+    [Test]
+    public void TestSimpleDivide_2()
+    {
+        const string input = "3680[W]/230[V]";
+        const string output = "16[A]";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
 }
