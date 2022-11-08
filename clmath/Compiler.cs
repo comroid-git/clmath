@@ -7,7 +7,7 @@ public class MathCompiler : MathBaseVisitor<Component>
 {
     public override Component VisitUnit(MathParser.UnitContext? context)
     {
-        return new Component { type = Component.Type.Unit, arg = context?.u?.GetText() };
+        return context?.u == null ? null! : new Component { type = Component.Type.Unit, arg = context?.u?.GetText() };
     }
 
     public override Component VisitExprNum(MathParser.ExprNumContext context)
@@ -352,7 +352,7 @@ public sealed class Component
         throw new NotSupportedException(ToString());
     }
 
-    private SiUnit? ToUnit(MathContext? ctx) => ctx == null ? null : new((string)arg!, ctx.GetUnitPackages());
+    private SiUnit? ToUnit(MathContext? ctx) => ctx == null || arg == null ? null : new((string)arg!, ctx.GetUnitPackages());
 
     public override string ToString()
     {

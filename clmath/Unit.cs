@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace clmath;
@@ -84,7 +85,8 @@ public sealed class UnitResult
         return new UnitResult(unit, si1.Convert(si2, value));
     }
 
-    public override string ToString() => $"{Value}[{Unit?.ToString() ?? string.Empty}]";
+    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture) +
+                                         (Unit.ToString() == string.Empty ? string.Empty : $"[{Unit}]");
 }
 
 public abstract class AbstractUnit
