@@ -139,6 +139,22 @@ public sealed class Unit : AbstractUnit
 
     public override string ToString() => Id;
     protected override Unit AsUnit() => this;
+
+    public void AddProduct(Unit other, Unit result)
+    {
+        this.Products[other] = result;
+        other.Products[this] = result;
+        result.Quotients[this] = other;
+        result.Quotients[other] = this;
+    }
+
+    public void AddQuotient(Unit other, Unit result)
+    {
+        this.Quotients[other] = result;
+        this.Quotients[result] = other;
+        other.Products[result] = this;
+        result.Products[other] = this;
+    }
 }
 
 public sealed class UnitPackage
@@ -177,16 +193,10 @@ public sealed class UnitPackage
             switch (match.Groups[1].Value)
             {
                 case "p":
-                    unit.Products[other] = result;
-                    other.Products[unit] = result;
-                    result.Quotients[other] = unit;
-                    result.Quotients[unit] = other;
+                    unit.AddProduct(other, result);
                     break;
                 case "q":
-                    unit.Quotients[other] = result;
-                    unit.Quotients[result] = other;
-                    other.Products[result] = unit;
-                    result.Products[other] = unit;
+                    unit.AddQuotient(other, result);
                     break;
                 default: throw new Exception("Invalid descriptor: " + line);
             }

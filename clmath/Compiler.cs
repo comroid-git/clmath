@@ -352,7 +352,7 @@ public sealed class Component
         throw new NotSupportedException(ToString());
     }
 
-    private SiUnit? ToUnit(MathContext? ctx) => ctx == null || arg == null ? null : new((string)arg!, ctx.GetUnitPackages());
+    internal SiUnit? ToUnit(MathContext? ctx) => ctx == null || arg == null ? null : new((string)arg!, ctx.GetUnitPackages());
 
     public override string ToString()
     {

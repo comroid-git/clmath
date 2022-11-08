@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
@@ -35,7 +36,7 @@ public static class Program
     };
     internal static Dictionary<string, double> constants { get; private set; } = null!;
     private static readonly Stack<(Component func, MathContext ctx)> stash = new();
-    internal static readonly Dictionary<string, UnitPackage> unitPackages = new();
+    internal static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
     private static readonly List<string> enabledUnitPacks = new();
 
     static Program()
@@ -491,12 +492,43 @@ public static class Program
     {
         if (IsInvalidArgumentCount(cmds, 2))
             return;
-        var data = f ?? func.ToString();
-        if (cmds.Length > 2 && cmds[2] == "-y")
-            data += $"\n{ConvertValuesToString(ctx.var, globalConstants.ContainsKey)}";
-        var path = Path.Combine(dir, cmds[1] + FuncExt);
-        File.WriteAllText(path, data);
-        Console.WriteLine($"Function saved as {cmds[1]}");
+        if (cmds[1] == "unit")
+        { // save as unit
+            if (IsInvalidArgumentCount(cmds, 4))
+                return;
+            if (func.type != Component.Type.Frac 
+                || (func.type == Component.Type.Op &&
+                    func.op is not Component.Operator.Multiply or Component.Operator.Divide)
+                || func.x?.type != Component.Type.Num || func.y?.type != Component.Type.Num)
+            {
+                Console.WriteLine($"Error: Cannot convert operation {func} to a unit");
+                return;
+            }
+            var pkg = unitPackages.GetOrAdd(cmds[2], id => new UnitPackage(id));
+            var result = pkg.Get(cmds[3]);
+            var unitA = func.x?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
+            var unitB = func.y?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
+            
+            if (func.type == Component.Type.Frac || (func.type == Component.Type.Op && func.op == Component.Operator.Divide))
+            {
+                unitA.AddQuotient(unitB, result);
+                unitB.AddQuotient(unitA, result);
+            }
+            else if (func.type == Component.Type.Op && func.op == Component.Operator.Multiply)
+            {
+                unitA.AddProduct(unitB, result);
+                unitB.AddProduct(unitA, result);
+            }
+            else throw new Exception("Assertion failure");
+        } else
+        {
+            var data = f ?? func.ToString();
+            if (cmds.Length > 2 && cmds[2] == "-y")
+                data += $"\n{ConvertValuesToString(ctx.var, globalConstants.ContainsKey)}";
+            var path = Path.Combine(dir, cmds[1] + FuncExt);
+            File.WriteAllText(path, data);
+            Console.WriteLine($"Function saved as {cmds[1]}");
+        }
     }
 
     private static void CmdClearVar(string[] cmds, MathContext ctx)
