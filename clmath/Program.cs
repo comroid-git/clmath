@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -22,6 +23,7 @@ public static class Program
     private static readonly string constantsFile = Path.Combine(dir, "constants" + ConstExt);
     private static readonly string configFile = Path.Combine(dir, "config.bin");
 
+    private static readonly int ConfigVersion;
     private static bool _exiting;
     private static bool _dropAll;
     private static Graph? _graph;
@@ -41,6 +43,7 @@ public static class Program
 
     static Program()
     {
+        ConfigVersion = FileVersionInfo.GetVersionInfo(typeof(Program).Assembly.Location).FileMajorPart;
         SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
@@ -92,8 +95,6 @@ public static class Program
         }
     }
     
-    private const int ConfigVersion = 10;
-
     private static void SaveConfig()
     {
         using var fs = File.OpenWrite(configFile);
