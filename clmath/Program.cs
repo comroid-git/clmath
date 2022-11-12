@@ -499,7 +499,7 @@ public static class Program
             if (func.type != Component.Type.Frac 
                 || (func.type == Component.Type.Op &&
                     func.op is not Component.Operator.Multiply or Component.Operator.Divide)
-                || func.x?.type != Component.Type.Num || func.y?.type != Component.Type.Num)
+                || func.x?.type != Component.Type.Var || func.y?.type != Component.Type.Var)
             {
                 Console.WriteLine($"Error: Cannot convert operation {func} to a unit");
                 return;
