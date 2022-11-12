@@ -16,7 +16,7 @@ public sealed class TestUnit
     public void TestSimpleMultiply()
     {
         const string input = "230[V]*16[A]";
-        const string output = "3680[W]";
+        const string output = "3.68[kW]";
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }

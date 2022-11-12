@@ -259,18 +259,18 @@ public sealed class Component
         switch (type)
         {
             case Type.Num:
-                return new UnitResult(unitX?.ToUnit(ctx!), (double)arg!);
+                return new UnitResult(unitX?.ToUnit(ctx!), (double)arg!).Normalize();
             case Type.Var:
                 if (arg is not string name)
                     throw new Exception("Invalid arg: " + arg);
                 if (name.StartsWith("rng"))
                     if (name.EndsWith("i"))
-                        return new UnitResult(Random.Shared.Next());
+                        return new UnitResult(Random.Shared.Next()).Normalize();
                     else if (name.EndsWith("d"))
-                        return new UnitResult(Random.Shared.NextDouble());
+                        return new UnitResult(Random.Shared.NextDouble()).Normalize();
                     else throw new Exception("Invalid random: " + arg);
                 if (Program.constants.TryGetValue(name, out var val))
-                    return new UnitResult(val);
+                    return new UnitResult(val).Normalize();
                 return ctx!.var[name].Evaluate(ctx);
             case Type.FuncX:
                 double result;
@@ -304,41 +304,41 @@ public sealed class Component
                         break;
                     default: throw new Exception("invalid state");
                 }
-                return new UnitResult(unitX?.ToUnit(ctx!), result);
+                return new UnitResult(unitX?.ToUnit(ctx!), result).Normalize();
             case Type.Factorial:
                 var yield = 1;
                 for (var rem = (int)x!.Value; rem > 0; rem--)
                     yield *= rem;
-                return new UnitResult(unitX?.ToUnit(ctx!), yield);
+                return new UnitResult(unitX?.ToUnit(ctx!), yield).Normalize();
             case Type.Root:
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, 1 / (y?.Value ?? 2d)));
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
             case Type.Abs:
-                return new UnitResult(unitX?.ToUnit(ctx!), Math.Abs(x!.Value));
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Abs(x!.Value)).Normalize();
             case Type.Frac:
                 return x! / y!;
             case Type.Op:
                 switch (op)
                 {
                     case Operator.Add:
-                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value + y!.Value);
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value + y!.Value).Normalize();
                     case Operator.Subtract:
-                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value - y!.Value);
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value - y!.Value).Normalize();
                     case Operator.Multiply:
                         return x! * y!;
                     case Operator.Divide:
                         return x! / y!;
                     case Operator.Modulus:
-                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value % y!.Value);
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value % y!.Value).Normalize();
                     case Operator.Power:
-                        return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, y!.Value));
+                        return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, y!.Value)).Normalize();
                     case null: throw new Exception("invalid state");
                 }
 
                 break;
             case Type.Eval:
                 if (Program.LoadFunc(arg!.ToString()!) is not { } res)
-                    return new UnitResult(unitX?.ToUnit(ctx!), double.NaN);
+                    return new UnitResult(unitX?.ToUnit(ctx!), double.NaN).Normalize();
                 var subCtx = new MathContext(res.ctx);
                 foreach (var (key, value) in ctx!.var)
                     subCtx.var[key] = value;
@@ -346,7 +346,7 @@ public sealed class Component
                     subCtx.var[var.arg!.ToString()!] = var.x!;
                 return res.func.Evaluate(subCtx);
             case Type.Parentheses:
-                return new UnitResult(unitX?.ToUnit(ctx!), x!.Value);
+                return new UnitResult(unitX?.ToUnit(ctx!), x!.Value).Normalize();
         }
 
         throw new NotSupportedException(ToString());

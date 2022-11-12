@@ -47,8 +47,10 @@ public sealed class SiPrefix
 
     public override string ToString() => Id;
 
-    public static UnitResult Minimize(Unit unit, double value)
+    public static UnitResult Normalize(Unit unit, double value)
     {
+        if (unit.Id == string.Empty)
+            return new UnitResult(SiUnit.None, value);
         for (var i = 0; i < values.Count; i++)
         {
             var si = values[i];
@@ -81,7 +83,7 @@ public sealed class UnitResult
         var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
         var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
         var outputUnit = left.Unit.Multiply(right.Unit);
-        return SiPrefix.Minimize(outputUnit, lhs * rhs);
+        return SiPrefix.Normalize(outputUnit, lhs * rhs);
     }
 
     public static UnitResult operator /(UnitResult left, UnitResult right)
@@ -89,8 +91,10 @@ public sealed class UnitResult
         var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
         var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
         var outputUnit = left.Unit.Divide(right.Unit);
-        return SiPrefix.Minimize(outputUnit, lhs / rhs);
+        return SiPrefix.Normalize(outputUnit, lhs / rhs);
     }
+
+    public UnitResult Normalize() => SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value));
 
     public override string ToString() => Value.ToString(CultureInfo.InvariantCulture) +
                                          (Unit.ToString() == string.Empty ? string.Empty : $"[{Unit}]");
