@@ -238,14 +238,14 @@ public static class Program
                     Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
                     Console.WriteLine("\tlist <target>\t\t\tLists things");
                     Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
-                    Console.WriteLine("\tdisable <target>\t\t\tDisables the specified unit package");
+                    Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
                     Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
                     Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
                     Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
                     Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
                     Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
                     Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
-                    Console.WriteLine("\tsolve <var> <lhs> <func>\tSets the mode to Deg/Rad/Grad");
+                    Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
                     Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
                     Console.WriteLine("\nEnter a function to start evaluating");
                     break;
@@ -681,6 +681,11 @@ public static class Program
             case "units":
                 if (IsInvalidArgumentCount(cmds, 3))
                     break;
+                if (!unitPackages.ContainsKey(cmds[2]))
+                {
+                    Console.WriteLine($"Error: Unit pack with name {cmds[2]} was not found");
+                    break;
+                }
                 var package = unitPackages[cmds[2]];
                 if (package.values.IsEmpty)
                 {
