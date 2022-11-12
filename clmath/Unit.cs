@@ -130,7 +130,7 @@ public sealed class SiUnit : AbstractUnit
         Prefix = si ?? SiPrefix.None;
         Unit = unit 
                ?? packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str)
-               ?? throw new Exception("No unit found with identifier " + str);
+               ?? Unit.None;
     }
 
     internal SiUnit(SiPrefix prefix, Unit unit)
