@@ -37,8 +37,7 @@ public sealed class SiPrefix
 
     private SiPrefix(string id, int exp)
     {
-        if (id != string.Empty)
-            values.Add(this);
+        values.Add(this);
         Id = id;
         Factor = Math.Pow(10, exp);
     }
@@ -120,7 +119,7 @@ public sealed class SiUnit : AbstractUnit
         SiPrefix? si = null;
         if (unit == null)
         {
-            si = SiPrefix.values.FirstOrDefault(si => str.StartsWith(si.Id));
+            si = SiPrefix.values.FirstOrDefault(prefix => prefix.Id.Length > 0 && str.StartsWith(prefix.Id));
             if (si != null)
             {
                 var offset = str.IndexOf(si.Id, StringComparison.Ordinal) + si.Id.Length;
