@@ -16,13 +16,13 @@ public sealed class SiPrefix
     public static readonly SiPrefix Nano = new("n", -9);
     public static readonly SiPrefix Micro = new("μ", -6);
     public static readonly SiPrefix Milli = new("m", -3);
-    public static readonly SiPrefix Centi = new("c", -2);
-    public static readonly SiPrefix Deci = new("d", -1);
+    //public static readonly SiPrefix Centi = new("c", -2);
+    //public static readonly SiPrefix Deci = new("d", -1);
     
     public static readonly SiPrefix None = new(string.Empty, 0);
     
-    public static readonly SiPrefix Deca = new("da", 1);
-    public static readonly SiPrefix Hecto = new("h", 2);
+    //public static readonly SiPrefix Deca = new("da", 1);
+    //public static readonly SiPrefix Hecto = new("h", 2);
     public static readonly SiPrefix Kilo = new("k", 3);
     public static readonly SiPrefix Mega = new("M", 6);
     public static readonly SiPrefix Giga = new("G", 9);
