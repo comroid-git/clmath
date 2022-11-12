@@ -105,15 +105,21 @@ public sealed class SiUnit : AbstractUnit
 
     public SiUnit(string str, params UnitPackage[] packages)
     {
-        var si = SiPrefix.values.FirstOrDefault(si => str.StartsWith(si.Id));
-        if (si != null)
+        var unit = packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str);
+        SiPrefix? si = null;
+        if (unit == null)
         {
-            var offset = str.IndexOf(si.Id, StringComparison.Ordinal) + si.Id.Length;
-            str = str.Substring(offset, str.Length - offset);
+            si = SiPrefix.values.FirstOrDefault(si => str.StartsWith(si.Id));
+            if (si != null)
+            {
+                var offset = str.IndexOf(si.Id, StringComparison.Ordinal) + si.Id.Length;
+                str = str.Substring(offset, str.Length - offset);
+            }
         }
 
         Prefix = si ?? SiPrefix.None;
-        Unit = packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str)
+        Unit = unit 
+               ?? packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str)
                ?? throw new Exception("No unit found with identifier " + str);
     }
 
