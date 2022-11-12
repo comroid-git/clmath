@@ -3,7 +3,7 @@
 namespace clmath.test;
 
 [Parallelizable(ParallelScope.None)]
-public class TestMath
+public sealed class TestMath
 {
     [SetUp]
     public void SetUp() => Program.SetUp();

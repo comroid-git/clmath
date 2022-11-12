@@ -5,9 +5,19 @@ namespace clmath;
 
 public class MathCompiler : MathBaseVisitor<Component>
 {
-    public override Component VisitNum(MathParser.NumContext context)
+    public override Component VisitUnit(MathParser.UnitContext? context)
     {
-        return new Component { type = Component.Type.Num, arg = double.Parse(context.GetText()) };
+        return context?.u == null ? null! : new Component { type = Component.Type.Unit, arg = context?.u?.GetText() };
+    }
+
+    public override Component VisitExprNum(MathParser.ExprNumContext context)
+    {
+        return new Component
+        {
+            type = Component.Type.Num,
+            arg = double.Parse(context.num().GetText()),
+            unitX = VisitUnit(context.u)
+        };
     }
 
     public override Component VisitWord(MathParser.WordContext context)
@@ -15,17 +25,23 @@ public class MathCompiler : MathBaseVisitor<Component>
         return new Component { type = Component.Type.Var, arg = context.GetText() };
     }
 
-    public override Component VisitFrac(MathParser.FracContext context)
+    public override Component VisitExprFrac(MathParser.ExprFracContext context)
     {
-        return new Component { type = Component.Type.Frac, x = Visit(context.x), y = Visit(context.y) };
+        return new Component
+        {
+            type = Component.Type.Frac,
+            x = Visit(context.frac().x),
+            y = Visit(context.frac().y),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitFx(MathParser.FxContext context)
+    public override Component VisitExprFunc(MathParser.ExprFuncContext context)
     {
         return new Component
         {
             type = Component.Type.FuncX,
-            func = context.func().Start.Type switch
+            func = context.fx().func().Start.Type switch
             {
                 MathLexer.SIN => Component.FuncX.Sin,
                 MathLexer.COS => Component.FuncX.Cos,
@@ -38,25 +54,54 @@ public class MathCompiler : MathBaseVisitor<Component>
                 MathLexer.ARCSIN => Component.FuncX.ArcSin,
                 MathLexer.ARCCOS => Component.FuncX.ArcCos,
                 MathLexer.ARCTAN => Component.FuncX.ArcTan,
-                _ => throw new NotSupportedException(context.func().GetText())
+                _ => throw new NotSupportedException(context.fx().func().GetText())
             },
-            x = Visit(context.x)
+            x = Visit(context.fx().x),
+            unitX = VisitUnit(context.u)
         };
     }
 
     public override Component VisitExprFact(MathParser.ExprFactContext context)
     {
-        return new Component { type = Component.Type.Factorial, x = Visit(context.x) };
+        return new Component
+        {
+            type = Component.Type.Factorial,
+            x = Visit(context.x),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitRoot(MathParser.RootContext context)
+    public override Component VisitExprRoot(MathParser.ExprRootContext context)
     {
-        return new Component { type = Component.Type.Root, x = Visit(context.x), y = Visit(context.i) };
+        return new Component
+        {
+            type = Component.Type.Root,
+            x = Visit(context.root().x),
+            y = Visit(context.root().i),
+            unitX = VisitUnit(context.u)
+        };
     }
 
-    public override Component VisitAbs(MathParser.AbsContext context)
+    public override Component VisitExprAbs(MathParser.ExprAbsContext context)
     {
-        return new Component { type = Component.Type.Abs, x = Visit(context.x) };
+        return new Component
+        {
+            type = Component.Type.Abs,
+            x = Visit(context.abs().x),
+            unitX = VisitUnit(context.u)
+        };
+    }
+
+    public override Component VisitExprPow(MathParser.ExprPowContext context)
+    {
+        return new Component
+        {
+            type = Component.Type.Op,
+            op = Component.Operator.Power,
+            x = Visit(context.x),
+            y = Visit(context.y),
+            unitX = VisitUnit(context.lu)
+        };
     }
 
     public override Component VisitExprOp1(MathParser.ExprOp1Context context)
@@ -66,11 +111,15 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_1().Start.Type switch
             {
-                MathLexer.POW => Component.Operator.Power,
+                MathLexer.OP_MUL => Component.Operator.Multiply,
+                MathLexer.OP_DIV => Component.Operator.Divide,
+                MathLexer.OP_MOD => Component.Operator.Modulus,
                 _ => throw new NotSupportedException(context.op_1().GetText())
             },
             x = Visit(context.l),
-            y = Visit(context.r)
+            y = Visit(context.r),
+            unitX = VisitUnit(context.lu),
+            unitY = VisitUnit(context.ru)
         };
     }
 
@@ -81,29 +130,14 @@ public class MathCompiler : MathBaseVisitor<Component>
             type = Component.Type.Op,
             op = context.op_2().Start.Type switch
             {
-                MathLexer.OP_MUL => Component.Operator.Multiply,
-                MathLexer.OP_DIV => Component.Operator.Divide,
-                MathLexer.OP_MOD => Component.Operator.Modulus,
+                MathLexer.OP_ADD => Component.Operator.Add,
+                MathLexer.OP_SUB => Component.Operator.Subtract,
                 _ => throw new NotSupportedException(context.op_2().GetText())
             },
             x = Visit(context.l),
-            y = Visit(context.r)
-        };
-    }
-
-    public override Component VisitExprOp3(MathParser.ExprOp3Context context)
-    {
-        return new Component
-        {
-            type = Component.Type.Op,
-            op = context.op_3().Start.Type switch
-            {
-                MathLexer.OP_ADD => Component.Operator.Add,
-                MathLexer.OP_SUB => Component.Operator.Subtract,
-                _ => throw new NotSupportedException(context.op_3().GetText())
-            },
-            x = Visit(context.l),
-            y = Visit(context.r)
+            y = Visit(context.r),
+            unitX = VisitUnit(context.lu),
+            unitY = VisitUnit(context.ru)
         };
     }
 
@@ -122,7 +156,8 @@ public class MathCompiler : MathBaseVisitor<Component>
         return new Component
         {
             type = Component.Type.Parentheses,
-            x = Visit(context.n)
+            x = Visit(context.n),
+            unitX = VisitUnit(context.u)
         };
     }
 
@@ -186,7 +221,8 @@ public sealed class Component
         Eval,
         EvalVar,
         Op,
-        Parentheses
+        Parentheses,
+        Unit
     }
 
     public Type type { get; init; }
@@ -194,6 +230,8 @@ public sealed class Component
     public Operator? op { get; init; }
     public Component? x { get; set; }
     public Component? y { get; set; }
+    public Component? unitX { get; init; }
+    public Component? unitY { get; init; }
     public object? arg { get; set; }
     public Component[] args { get; init; }
 
@@ -214,86 +252,93 @@ public sealed class Component
         return vars;
     }
 
-    public double Evaluate(MathContext? ctx)
+    public UnitResult Evaluate(MathContext? ctx)
     {
         var x = this.x?.Evaluate(ctx);
         var y = this.y?.Evaluate(ctx);
         switch (type)
         {
             case Type.Num:
-                return (double)arg!;
+                return new UnitResult(unitX?.ToUnit(ctx!), (double)arg!).Normalize();
             case Type.Var:
                 if (arg is not string name)
                     throw new Exception("Invalid arg: " + arg);
                 if (name.StartsWith("rng"))
                     if (name.EndsWith("i"))
-                        return Random.Shared.Next();
+                        return new UnitResult(Random.Shared.Next()).Normalize();
                     else if (name.EndsWith("d"))
-                        return Random.Shared.NextDouble();
+                        return new UnitResult(Random.Shared.NextDouble()).Normalize();
                     else throw new Exception("Invalid random: " + arg);
                 if (Program.constants.TryGetValue(name, out var val))
-                    return val;
+                    return new UnitResult(val).Normalize();
                 return ctx!.var[name].Evaluate(ctx);
             case Type.FuncX:
+                double result;
                 switch (func)
                 {
                     case FuncX.Sin:
-                        return Math.Sin(Program.IntoDRG(x!.Value));
+                        result = Math.Sin(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Cos:
-                        return Math.Cos(Program.IntoDRG(x!.Value));
+                        result = Math.Cos(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Tan:
-                        return Math.Tan(Program.IntoDRG(x!.Value));
+                        result = Math.Tan(Program.IntoDRG(x!.Value));
+                        break;
                     case FuncX.Log:
-                        return Math.Log(x!.Value);
+                        result = Math.Log(x!.Value);
+                        break;
                     case FuncX.Sec:
                     case FuncX.Csc:
                     case FuncX.Cot:
                     case FuncX.Hyp:
                         throw new NotImplementedException(func.ToString());
                     case FuncX.ArcSin:
-                        return Program.FromDRG(Math.Asin(x!.Value));
+                        result = Program.FromDRG(Math.Asin(x!.Value));
+                        break;
                     case FuncX.ArcCos:
-                        return Program.FromDRG(Math.Acos(x!.Value));
+                        result = Program.FromDRG(Math.Acos(x!.Value));
+                        break;
                     case FuncX.ArcTan:
-                        return Program.FromDRG(Math.Atan(x!.Value));
-                    case null: throw new Exception("invalid state");
+                        result = Program.FromDRG(Math.Atan(x!.Value));
+                        break;
+                    default: throw new Exception("invalid state");
                 }
-
-                break;
+                return new UnitResult(unitX?.ToUnit(ctx!), result).Normalize();
             case Type.Factorial:
                 var yield = 1;
                 for (var rem = (int)x!.Value; rem > 0; rem--)
                     yield *= rem;
-                return yield;
+                return new UnitResult(unitX?.ToUnit(ctx!), yield).Normalize();
             case Type.Root:
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                return Math.Pow(x!.Value, 1 / (y ?? 2d));
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
             case Type.Abs:
-                return Math.Abs(x!.Value);
+                return new UnitResult(unitX?.ToUnit(ctx!), Math.Abs(x!.Value)).Normalize();
             case Type.Frac:
-                return x!.Value / y!.Value;
+                return x! / y!;
             case Type.Op:
                 switch (op)
                 {
                     case Operator.Add:
-                        return x!.Value + y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value + y!.Value).Normalize();
                     case Operator.Subtract:
-                        return x!.Value - y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value - y!.Value).Normalize();
                     case Operator.Multiply:
-                        return x!.Value * y!.Value;
+                        return x! * y!;
                     case Operator.Divide:
-                        return x!.Value / y!.Value;
+                        return x! / y!;
                     case Operator.Modulus:
-                        return x!.Value % y!.Value;
+                        return new UnitResult(unitX?.ToUnit(ctx!), x!.Value % y!.Value).Normalize();
                     case Operator.Power:
-                        return Math.Pow(x!.Value, y!.Value);
+                        return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, y!.Value)).Normalize();
                     case null: throw new Exception("invalid state");
                 }
 
                 break;
             case Type.Eval:
                 if (Program.LoadFunc(arg!.ToString()!) is not { } res)
-                    return double.NaN;
+                    return new UnitResult(unitX?.ToUnit(ctx!), double.NaN).Normalize();
                 var subCtx = new MathContext(res.ctx);
                 foreach (var (key, value) in ctx!.var)
                     subCtx.var[key] = value;
@@ -301,30 +346,33 @@ public sealed class Component
                     subCtx.var[var.arg!.ToString()!] = var.x!;
                 return res.func.Evaluate(subCtx);
             case Type.Parentheses:
-                return x!.Value;
+                return new UnitResult(unitX?.ToUnit(ctx!), x!.Value).Normalize();
         }
 
         throw new NotSupportedException(ToString());
     }
 
+    internal SiUnit? ToUnit(MathContext? ctx) => ctx == null || arg == null ? null : new((string)arg!, ctx.GetUnitPackages());
+
     public override string ToString()
     {
+        string str = string.Empty;
         switch (type)
         {
             case Type.Num:
             case Type.Var:
-                return arg!.ToString()!;
+                return arg! + (unitX?.ToString() ?? string.Empty);
             case Type.FuncX:
-                return $"{func.ToString()!.ToLower()}({x})";
+                return $"{func.ToString()!.ToLower()}({x}){unitX?.ToString() ?? string.Empty}";
             case Type.Factorial:
-                return $"{x}!";
+                return $"{x}!{unitX?.ToString() ?? string.Empty}";
             case Type.Root:
                 var n = y?.ToString() ?? "2";
-                return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x})";
+                return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x}){unitX?.ToString() ?? string.Empty}";
             case Type.Abs:
-                return $"|{x}|";
+                return $"|{x}|{unitX?.ToString() ?? string.Empty}";
             case Type.Frac:
-                return $"frac({x})({y})";
+                return $"frac({x})({y}){unitX?.ToString() ?? string.Empty}";
             case Type.Op:
                 var op = this.op switch
                 {
@@ -342,7 +390,9 @@ public sealed class Component
                     ? string.Empty
                     : $"{{{string.Join("; ", args.Select(var => $"{var.arg}={var.x}"))}}}");
             case Type.Parentheses:
-                return $"({x})";
+                return $"({x}){unitX?.ToString() ?? string.Empty}";
+            case Type.Unit:
+                return (string)arg! == string.Empty ? string.Empty : $"[{arg}]";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type));
         }

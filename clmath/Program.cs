@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
@@ -11,6 +13,8 @@ public static class Program
     private const double factorD2G = 1.111111111;
     private static readonly string FuncExt = ".math";
     private static readonly string ConstExt = ".vars";
+    internal static readonly string UnitExt = ".unit";
+    internal static readonly string UnitPackExt = ".units";
 
     private static readonly string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "comroid", "clmath");
@@ -21,7 +25,6 @@ public static class Program
     private static bool _exiting;
     private static bool _dropAll;
     private static Graph? _graph;
-    private static readonly Stack<(Component func, MathContext ctx)> stash = new();
 
     private static readonly Dictionary<string, double> globalConstants = new()
     {
@@ -31,44 +34,31 @@ public static class Program
         { "rng_i", double.NaN },
         { "rng_d", double.NaN }
     };
-
-    private static CalcMode _drg = CalcMode.Deg;
-    private static bool _autoEval = true;
+    internal static Dictionary<string, double> constants { get; private set; } = null!;
+    private static readonly Stack<(Component func, MathContext ctx)> stash = new();
+    internal static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
+    private static readonly List<string> enabledUnitPacks = new();
 
     static Program()
     {
         SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
-        if (!File.Exists(constantsFile))
-            SaveConstants(new Dictionary<string, double>());
         if (!File.Exists(configFile))
             SaveConfig();
+        if (!File.Exists(constantsFile))
+            SaveConstants(new Dictionary<string, double>());
+        if (!LoadConfig())
+        {
+            File.Delete(configFile);
+            SaveConfig();
+        } 
         LoadConstants();
-        LoadConfig();
+        LoadUnits();
     }
 
-    public static CalcMode DRG
-    {
-        get => _drg;
-        set
-        {
-            _drg = value;
-            SaveConfig();
-        }
-    }
-
-    internal static bool AutoEval
-    {
-        get => _autoEval;
-        set
-        {
-            _autoEval = value;
-            SaveConfig();
-        }
-    }
-
-    internal static Dictionary<string, double> constants { get; private set; } = null!;
+    public static CalcMode DRG { get; set; } = CalcMode.Deg;
+    internal static bool AutoEval { get; set; } = true;
 
     public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
@@ -87,28 +77,59 @@ public static class Program
         foreach (var (key, value) in globalConstants)
             constants[key] = value;
         foreach (var (key, value) in ConvertValuesFromString(File.ReadAllText(constantsFile)))
-            constants[key] = value.Evaluate(null);
+            constants[key] = value.Evaluate(null).Value; // todo: use UnitResult in constants?
     }
+
+    private static void LoadUnits()
+    {
+        foreach (var pkg in Directory.EnumerateDirectories(dir, $"*{UnitPackExt}"))
+        {
+            var packageName = new DirectoryInfo(pkg).Name.StripExtension(UnitPackExt);
+            var package = new UnitPackage(packageName);
+            foreach (var unitFile in Directory.EnumerateFiles(pkg, $"*{UnitExt}"))
+                package.Load(unitFile);
+            unitPackages[packageName] = package;
+        }
+    }
+    
+    private const int ConfigVersion = 10;
 
     private static void SaveConfig()
     {
         using var fs = File.OpenWrite(configFile);
+        fs.Write(BitConverter.GetBytes(ConfigVersion));
         fs.Write(new[] { (byte)DRG });
         fs.Write(BitConverter.GetBytes(AutoEval));
+        fs.Write(BitConverter.GetBytes(enabledUnitPacks.Count));
+        foreach (var pack in enabledUnitPacks)
+        {
+            var buffer = Encoding.ASCII.GetBytes(pack);
+            fs.Write(BitConverter.GetBytes(buffer.Length));
+            fs.Write(buffer);
+        }
     }
 
-    private static void LoadConfig()
+    private static bool LoadConfig()
     {
         using var fs = File.OpenRead(configFile);
-        _drg = (CalcMode)Read(fs, 1)[0];
-        _autoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
+        if (ConfigVersion != BitConverter.ToInt32(Read(fs, sizeof(int))))
+            return false;
+        DRG = (CalcMode)Read(fs, 1)[0];
+        AutoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
+        var enabledPackCount = BitConverter.ToInt32(Read(fs, sizeof(int)));
+        for (; enabledPackCount > 0; enabledPackCount--)
+        {
+            var len = BitConverter.ToInt32(Read(fs, sizeof(int)));
+            enabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
+        }
+        return true;
     }
 
     private static byte[] Read(Stream s, int len)
     {
         var buf = new byte[len];
         if (len != s.Read(buf, 0, len))
-            throw new Exception("Invalid Number of bytes was read");
+            return new byte[len];
         return buf;
     }
 
@@ -181,6 +202,7 @@ public static class Program
             }
         }
 
+        SaveConfig();
         _exiting = false;
     }
 
@@ -215,13 +237,15 @@ public static class Program
                     Console.WriteLine("\tset <const>\t\t\tDefines a constant");
                     Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
                     Console.WriteLine("\tlist <target>\t\t\tLists things");
+                    Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
+                    Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
                     Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
                     Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
                     Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
                     Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
                     Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
                     Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
-                    Console.WriteLine("\tsolve <var> <lhs> <func>\tSets the mode to Deg/Rad/Grad");
+                    Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
                     Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
                     Console.WriteLine("\nEnter a function to start evaluating");
                     break;
@@ -233,6 +257,9 @@ public static class Program
                     break;
                 case "list":
                     CmdList(cmds);
+                    break;
+                case "enable" or "disable":
+                    CmdToggleState(cmds, cmds[0] == "enable");
                     break;
                 case "load":
                     CmdLoad(cmds);
@@ -271,7 +298,7 @@ public static class Program
         return args.ToList()
             .GetRange(start, args.Length - start)
             .Select(ParseFunc)
-            .Select(fx => (fx, new MathContext()))
+            .Select(fx => (fx, new MathContext(){enabledUnitPacks = enabledUnitPacks}))
             .ToArray();
     }
 
@@ -290,11 +317,11 @@ public static class Program
         if (lnb != -1)
         {
             var vars = ConvertValuesFromString(data.Substring(lnb + 1, data.Length - lnb - 2));
-            ctx = new MathContext(vars);
+            ctx = new MathContext(vars, enabledUnitPacks);
         }
         else
         {
-            ctx = new MathContext();
+            ctx = new MathContext(){enabledUnitPacks = enabledUnitPacks};
         }
 
         return (ParseFunc(lnb == -1 ? data : data.Substring(0, lnb)), ctx);
@@ -305,7 +332,7 @@ public static class Program
         if (arr.Length < min)
         {
             Console.WriteLine(
-                $"Error: Not enough arguments; requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
+                $"Error: Not enough arguments; '{arr[0]}' requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
             return true;
         }
 
@@ -331,13 +358,13 @@ public static class Program
     {
         if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
         {
-            var res = func.Evaluate(null);
+            var res = func.Evaluate(new MathContext(){enabledUnitPacks = enabledUnitPacks});
             PrintResult(func, res);
         }
         else
         {
             // enter editor mode
-            ctx ??= new MathContext();
+            ctx ??= new MathContext(){enabledUnitPacks = enabledUnitPacks};
             while (true)
             {
                 if (_exiting || _dropAll)
@@ -465,12 +492,43 @@ public static class Program
     {
         if (IsInvalidArgumentCount(cmds, 2))
             return;
-        var data = f ?? func.ToString();
-        if (cmds.Length > 2 && cmds[2] == "-y")
-            data += $"\n{ConvertValuesToString(ctx.var, globalConstants.ContainsKey)}";
-        var path = Path.Combine(dir, cmds[1] + FuncExt);
-        File.WriteAllText(path, data);
-        Console.WriteLine($"Function saved as {cmds[1]}");
+        if (cmds[1] == "unit")
+        { // save as unit
+            if (IsInvalidArgumentCount(cmds, 4))
+                return;
+            if (func.type != Component.Type.Frac 
+                || (func.type == Component.Type.Op &&
+                    func.op is not Component.Operator.Multiply or Component.Operator.Divide)
+                || func.x?.type != Component.Type.Num || func.y?.type != Component.Type.Num)
+            {
+                Console.WriteLine($"Error: Cannot convert operation {func} to a unit");
+                return;
+            }
+            var pkg = unitPackages.GetOrAdd(cmds[2], id => new UnitPackage(id));
+            var result = pkg.Get(cmds[3]);
+            var unitA = func.x?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
+            var unitB = func.y?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
+            
+            if (func.type == Component.Type.Frac || (func.type == Component.Type.Op && func.op == Component.Operator.Divide))
+            {
+                unitA.AddQuotient(unitB, result);
+                unitB.AddQuotient(unitA, result);
+            }
+            else if (func.type == Component.Type.Op && func.op == Component.Operator.Multiply)
+            {
+                unitA.AddProduct(unitB, result);
+                unitB.AddProduct(unitA, result);
+            }
+            else throw new Exception("Assertion failure");
+        } else
+        {
+            var data = f ?? func.ToString();
+            if (cmds.Length > 2 && cmds[2] == "-y")
+                data += $"\n{ConvertValuesToString(ctx.var, globalConstants.ContainsKey)}";
+            var path = Path.Combine(dir, cmds[1] + FuncExt);
+            File.WriteAllText(path, data);
+            Console.WriteLine($"Function saved as {cmds[1]}");
+        }
     }
 
     private static void CmdClearVar(string[] cmds, MathContext ctx)
@@ -522,7 +580,7 @@ public static class Program
             return;
         }
 
-        constants[setConst.key] = setConst.value.Evaluate(null);
+        constants[setConst.key] = setConst.value.Evaluate(null).Value; // todo use UnitResult in constants?
         SaveConstants();
     }
 
@@ -548,9 +606,10 @@ public static class Program
 
     private static void CmdList(string[] cmds)
     {
+        const string options = "'funcs', 'constants', 'stash', 'enabled', 'packs' and 'units <pack>'";
         if (cmds.Length == 1)
         {
-            Console.WriteLine("Error: Listing target unspecified; options are 'funcs', 'constants' and 'stash'");
+            Console.WriteLine("Error: Listing target unspecified; options are " + options);
             return;
         }
 
@@ -561,51 +620,114 @@ public static class Program
                 if (funcs.Length == 0)
                 {
                     Console.WriteLine("No saved functions");
+                    break;
                 }
-                else
-                {
-                    Console.WriteLine("Available functions:");
-                    foreach (var file in funcs)
-                        Console.WriteLine(
-                            $"\t- {file.Name.Substring(0, file.Name.Length - FuncExt.Length)}");
-                }
+                Console.WriteLine("Available functions:");
+                foreach (var file in funcs)
+                    Console.WriteLine(
+                        $"\t- {file.Name.Substring(0, file.Name.Length - FuncExt.Length)}");
 
                 break;
             case "constants" or "const":
                 if (constants.Count == 0)
                 {
                     Console.WriteLine("No available constants");
+                    break;
                 }
-                else
-                {
-                    Console.WriteLine("Available constants:");
-                    foreach (var (key, value) in constants)
-                        Console.WriteLine($"\t{key}\t= {value}");
-                }
+                Console.WriteLine("Available constants:");
+                foreach (var (key, value) in constants)
+                    Console.WriteLine($"\t{key}\t= {value}");
 
                 break;
             case "stash":
                 if (stash.Count == 0)
                 {
                     Console.WriteLine("No functions in stash");
+                    break;
                 }
-                else
+                Console.WriteLine("Stashed Functions:");
+                var i = 0;
+                foreach (var (fx, ctx) in stash)
                 {
-                    Console.WriteLine("Stashed Functions:");
-                    var i = 0;
-                    foreach (var (fx, ctx) in stash)
-                    {
-                        Console.WriteLine($"\tstash[{i++}]\t= {fx}");
-                        ctx.DumpVariables("stash[#]".Length / 8 + 1, false);
-                    }
+                    Console.WriteLine($"\tstash[{i++}]\t= {fx}");
+                    ctx.DumpVariables("stash[#]".Length / 8 + 1, false);
                 }
 
                 break;
+            case "enabled":
+                if (enabledUnitPacks.Count == 0)
+                {
+                    Console.WriteLine("No unit packs are enabled");
+                    break;
+                }
+                Console.WriteLine("Enabled unit packs:");
+                foreach (var pack in enabledUnitPacks) 
+                    Console.WriteLine($"\t- {pack}");
+                break;
+            case "packs":
+                var directories = Directory.GetDirectories(dir, $"*{UnitPackExt}");
+                if (directories.Length == 0)
+                {
+                    Console.WriteLine("No unit packages defined");
+                    break;
+                }
+                Console.WriteLine("Available unit packages:");
+                foreach (var pack in directories)
+                {
+                    var packName = new DirectoryInfo(pack).Name.StripExtension(UnitPackExt);
+                    Console.WriteLine($"\t- {packName}");
+                }
+                break;
+            case "units":
+                if (IsInvalidArgumentCount(cmds, 3))
+                    break;
+                if (!unitPackages.ContainsKey(cmds[2]))
+                {
+                    Console.WriteLine($"Error: Unit pack with name {cmds[2]} was not found");
+                    break;
+                }
+                var package = unitPackages[cmds[2]];
+                if (package.values.IsEmpty)
+                {
+                    Console.WriteLine("No units loaded");
+                    break;
+                }
+                Console.WriteLine($"Units in package '{package.Name}':");
+                foreach (var unit in package.values.Values)
+                {
+                    Console.WriteLine($"\t{unit.DisplayName}");
+                    foreach (var (factor, result) in unit.Products)
+                        Console.WriteLine($"\t\t{unit} = {result} / {factor}");
+                    foreach (var (dividend, result) in unit.Quotients)
+                        Console.WriteLine($"\t\t{unit} = {result} * {dividend}");
+                }
+                break;
             default:
                 Console.WriteLine(
-                    $"Error: Unknown listing target '{cmds[1]}';  options are 'funcs', 'constants' and 'stash'");
+                    $"Error: Unknown listing target '{cmds[1]}';  options are " + options);
                 break;
         }
+    }
+
+    private static void CmdToggleState(string[] cmds, bool newState)
+    {
+        if (IsInvalidArgumentCount(cmds, 2))
+            return;
+        var desiredPack = cmds[1];
+        if (!unitPackages.ContainsKey(desiredPack))
+        {
+            Console.WriteLine($"Unit pack {desiredPack} does not exist");
+            return;
+        }
+        if (newState == enabledUnitPacks.Contains(desiredPack))
+        {
+            Console.WriteLine($"Unit pack {desiredPack} is already " + (newState ? "enabled" : "disabled"));
+            return;
+        }
+        if (newState)
+            enabledUnitPacks.Add(desiredPack);
+        else enabledUnitPacks.Remove(desiredPack);
+        Console.WriteLine($"Unit pack {desiredPack} now " + (newState ? "enabled" : "disabled"));
     }
 
     private static void CmdLoad(string[] cmds)
@@ -756,12 +878,12 @@ public static class Program
         return maxAlign;
     }
 
-    private static void PrintResult(Component func, double res, MathContext? ctx = null)
+    private static void PrintResult(Component func, UnitResult result, MathContext? ctx = null)
     {
         var funcAlign = func.ToString().Length / 8 + 1;
         var align = Math.Max(1, (ctx?.DumpVariables(funcAlign) ?? 1) - funcAlign);
         var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-        Console.WriteLine($"\t{func}{spacer}= {res}");
+        Console.WriteLine($"\t{func}{spacer}= {result}");
     }
 
     internal static double IntoDRG(double value)
@@ -785,6 +907,13 @@ public static class Program
             _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Invalid Calculation Mode")
         };
     }
+
+    internal static string StripExtension(this string str, string ext)
+    {
+        if (str.EndsWith(ext))
+            str = str.Substring(0, str.IndexOf(ext, StringComparison.Ordinal));
+        return str;
+    }
 }
 
 public enum CalcMode : byte
@@ -797,19 +926,28 @@ public enum CalcMode : byte
 public sealed class MathContext
 {
     public readonly Dictionary<string, Component> var = new();
+    public List<string> enabledUnitPacks { get; init; }= new();
 
-    public MathContext() : this((MathContext?)null)
+    public MathContext() : this(null)
     {
     }
 
-    public MathContext(MathContext? copy) : this(copy?.var)
+    public MathContext(MathContext? copy) : this(copy?.var, copy?.enabledUnitPacks)
     {
     }
 
-    public MathContext(Dictionary<string, Component>? copy)
+    public MathContext(Dictionary<string, Component>? copy, List<string>? enabledUnitPacks)
     {
         if (copy != null)
             foreach (var (key, value) in copy)
                 var[key] = value;
+        if (enabledUnitPacks != null)
+            foreach (var pack in enabledUnitPacks)
+                this.enabledUnitPacks.Add(pack);
     }
+
+    public UnitPackage[] GetUnitPackages() => Program.unitPackages
+        .Where(pkg => enabledUnitPacks.Contains(pkg.Key))
+        .Select(pkg => pkg.Value)
+        .ToArray();
 }

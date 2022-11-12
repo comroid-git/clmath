@@ -61,14 +61,11 @@ WS: [ \n\r\t] -> channel(HIDDEN);
 idxExpr: IDX_L n=expr IDX_R;
 
 op_1
-    : POW
-;
-op_2
     : OP_MUL
     | OP_DIV
     | OP_MOD
 ;
-op_3
+op_2
     : OP_ADD
     | OP_SUB
 ;
@@ -80,19 +77,20 @@ root: ROOT i=idxExpr? PAR_L x=expr PAR_R;
 abs: ABS x=expr ABS;
 
 // expressions
+unit: IDX_L u=word IDX_R;
 expr
-    : l=expr op_1 r=expr    #exprOp1
-    | l=expr op_2 r=expr    #exprOp2
-    | PAR_L n=expr PAR_R    #exprPar
-    | frac                  #exprFrac
-    | fx                    #exprFunc
-    | x=expr FACTORIAL      #exprFact
-    | root                  #exprRoot
-    | abs                   #exprAbs
-    | num                   #exprNum
-    | word                  #exprId
-    | eval                  #exprEval
-    | l=expr op_3 r=expr    #exprOp3
+    : x=expr lu=unit? POW y=expr            #exprPow
+    | l=expr lu=unit? op_1 r=expr ru=unit?  #exprOp1
+    | PAR_L n=expr PAR_R u=unit             #exprPar
+    | frac u=unit?                          #exprFrac
+    | fx u=unit?                            #exprFunc
+    | x=expr FACTORIAL u=unit?              #exprFact
+    | root u=unit?                          #exprRoot
+    | abs u=unit?                           #exprAbs
+    | num u=unit?                           #exprNum
+    | word                                  #exprId
+    | eval                                  #exprEval
+    | l=expr lu=unit? op_2 r=expr ru=unit?  #exprOp2
 ;
 
 UNMATCHED: . ; // raise errors on unmatched

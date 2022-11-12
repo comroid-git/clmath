@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace clmath.test;
 
 [Parallelizable(ParallelScope.None)]
-public class TestSolver
+public sealed class TestSolver
 {
     [SetUp]
     public void SetUp() => Program.SetUp();
