@@ -52,9 +52,9 @@ public sealed class SiPrefix
         for (var i = 0; i < values.Count; i++)
         {
             var si = values[i];
-            var use = i < values.Count ? values[i] : null;
+            var next = i + 1 < values.Count ? values[i + 1] : null;
 
-            if (use != null && value >= use.Factor && value <= si.Factor)
+            if (next != null && value >= si.Factor && value < next.Factor)
                 return new UnitResult(new SiUnit(si, unit), si.Convert(None, value));
         }
         return new UnitResult(new SiUnit(None, unit), value);
@@ -78,20 +78,18 @@ public sealed class UnitResult
 
     public static UnitResult operator *(UnitResult left, UnitResult right)
     {
-        var si1 = right.Unit.Prefix;
-        var value = si1.Convert(left.Unit.Prefix, left.Value);
-        value *= right.Unit.Prefix.Convert(si1, right.Value);
-        //todo find good common unit prefix and convert to it
-        return SiPrefix.Minimize(left.Unit.Multiply(right.Unit), value);
+        var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
+        var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
+        var outputUnit = left.Unit.Multiply(right.Unit);
+        return SiPrefix.Minimize(outputUnit, lhs * rhs);
     }
 
     public static UnitResult operator /(UnitResult left, UnitResult right)
     {
-        var si1 = right.Unit.Prefix;
-        var value = si1.Convert(left.Unit.Prefix, left.Value);
-        value /= right.Unit.Prefix.Convert(si1, right.Value);
-        //todo find good common unit prefix and convert to it
-        return SiPrefix.Minimize(left.Unit.Divide(right.Unit), value);
+        var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
+        var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
+        var outputUnit = left.Unit.Divide(right.Unit);
+        return SiPrefix.Minimize(outputUnit, lhs / rhs);
     }
 
     public override string ToString() => Value.ToString(CultureInfo.InvariantCulture) +
