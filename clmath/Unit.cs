@@ -77,7 +77,7 @@ public sealed class UnitResult
     public static UnitResult operator /(UnitResult left, UnitResult right)
     {
         var si1 = right.Unit.Prefix;
-        var value = left.Unit.Prefix.Convert(si1, left.Value);
+        var value = si1.Convert(left.Unit.Prefix, left.Value);
         value /= right.Unit.Prefix.Convert(si1, right.Value);
         var unit = new SiUnit(si1, left.Unit.Divide(right.Unit));
         //todo find good common unit prefix and convert to it
