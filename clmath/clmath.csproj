@@ -5,7 +5,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageVersion>1.1.0.0</PackageVersion>
+        <PackageVersion>1.2.0</PackageVersion>
         <Title>clmath</Title>
         <Authors>comroid</Authors>
         <Description>A commandline math tool</Description>
@@ -13,7 +13,7 @@
         <PackageLicenseUrl>https://github.com/comroid-git/clmath/blob/master/LICENSE</PackageLicenseUrl>
         <RepositoryUrl>https://github.com/comroid-git/clmath</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <AssemblyVersion>1.1.0.0</AssemblyVersion>
+        <AssemblyVersion>1.2.0</AssemblyVersion>
         <FileVersion>10</FileVersion>
         <NeutralLanguage>en-150</NeutralLanguage>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -21,11 +21,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1"/>
-        <PackageReference Include="Antlr4BuildTasks" Version="11.5.0"/>
-        <PackageReference Include="Silk.NET.Input" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0"/>
+        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
+        <PackageReference Include="Antlr4BuildTasks" Version="11.5.0" />
+        <PackageReference Include="Silk.NET.Input" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0" />
     </ItemGroup>
 
     <ItemGroup>
