@@ -56,4 +56,13 @@ public sealed class TestUnit
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
+
+    [Test]
+    public void TestSiPrefix_3()
+    {
+        const string input = "100*100";
+        const string output = "10000";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
 }
