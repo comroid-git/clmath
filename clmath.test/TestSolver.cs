@@ -6,7 +6,10 @@ namespace clmath.test;
 public sealed class TestSolver
 {
     [SetUp]
-    public void SetUp() => Program.SetUp();
+    public void SetUp()
+    {
+        Program.SetUp();
+    }
 
     [Test]
     public void TestSquare()

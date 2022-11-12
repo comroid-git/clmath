@@ -15,12 +15,13 @@ public sealed class SiPrefix
     public static readonly SiPrefix Pico = new("p", -12);
     public static readonly SiPrefix Nano = new("n", -9);
     public static readonly SiPrefix Micro = new("μ", -6);
+
     public static readonly SiPrefix Milli = new("m", -3);
     //public static readonly SiPrefix Centi = new("c", -2);
     //public static readonly SiPrefix Deci = new("d", -1);
-    
+
     public static readonly SiPrefix None = new(string.Empty, 0);
-    
+
     //public static readonly SiPrefix Deca = new("da", 1);
     //public static readonly SiPrefix Hecto = new("h", 2);
     public static readonly SiPrefix Kilo = new("k", 3);
@@ -32,9 +33,6 @@ public sealed class SiPrefix
     public static readonly SiPrefix Zetta = new("Z", 21);
     public static readonly SiPrefix Yotta = new("Y", 24);
 
-    public string Id { get; }
-    public double Factor { get; }
-
     private SiPrefix(string id, int exp)
     {
         values.Add(this);
@@ -42,9 +40,18 @@ public sealed class SiPrefix
         Factor = Math.Pow(10, exp);
     }
 
-    public double Convert(SiPrefix from, double value) => value / Factor * from.Factor;
+    public string Id { get; }
+    public double Factor { get; }
 
-    public override string ToString() => Id;
+    public double Convert(SiPrefix from, double value)
+    {
+        return value / Factor * from.Factor;
+    }
+
+    public override string ToString()
+    {
+        return Id;
+    }
 
     public static UnitResult Normalize(Unit unit, double value)
     {
@@ -58,6 +65,7 @@ public sealed class SiPrefix
             if (next != null && value >= si.Factor && value < next.Factor)
                 return new UnitResult(new SiUnit(si, unit), si.Convert(None, value));
         }
+
         return new UnitResult(new SiUnit(None, unit), value);
     }
 }
@@ -93,18 +101,31 @@ public sealed class UnitResult
         return SiPrefix.Normalize(outputUnit, lhs / rhs);
     }
 
-    public UnitResult Normalize() => SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value));
+    public UnitResult Normalize()
+    {
+        return SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value));
+    }
 
-    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture) +
-                                         (Unit.ToString() == string.Empty ? string.Empty : $"[{Unit}]");
+    public override string ToString()
+    {
+        return Value.ToString(CultureInfo.InvariantCulture) +
+               (Unit.ToString() == string.Empty ? string.Empty : $"[{Unit}]");
+    }
 }
 
 public abstract class AbstractUnit
 {
     protected abstract Unit AsUnit();
-    
-    public Unit Multiply(AbstractUnit other) => AsUnit() == Unit.None ? Unit.None : AsUnit().Products[other.AsUnit()];
-    public Unit Divide(AbstractUnit other) => AsUnit() == Unit.None ? Unit.None : AsUnit().Quotients[other.AsUnit()];
+
+    public Unit Multiply(AbstractUnit other)
+    {
+        return AsUnit() == Unit.None ? Unit.None : AsUnit().Products[other.AsUnit()];
+    }
+
+    public Unit Divide(AbstractUnit other)
+    {
+        return AsUnit() == Unit.None ? Unit.None : AsUnit().Quotients[other.AsUnit()];
+    }
 }
 
 public sealed class SiUnit : AbstractUnit
@@ -128,7 +149,7 @@ public sealed class SiUnit : AbstractUnit
         }
 
         Prefix = si ?? SiPrefix.None;
-        Unit = unit 
+        Unit = unit
                ?? packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str)
                ?? Unit.None;
     }
@@ -139,8 +160,15 @@ public sealed class SiUnit : AbstractUnit
         Unit = unit;
     }
 
-    public override string ToString() => $"{Prefix}{Unit}";
-    protected override Unit AsUnit() => Unit;
+    public override string ToString()
+    {
+        return $"{Prefix}{Unit}";
+    }
+
+    protected override Unit AsUnit()
+    {
+        return Unit;
+    }
 }
 
 public sealed class Unit : AbstractUnit
@@ -148,17 +176,28 @@ public sealed class Unit : AbstractUnit
     public static readonly Unit None = new(UnitPackage.None, string.Empty);
     public readonly ConcurrentDictionary<Unit, Unit> Products = new();
     public readonly ConcurrentDictionary<Unit, Unit> Quotients = new();
+
+    internal Unit(UnitPackage package, string id)
+    {
+        package.values[Id = id] = this;
+    }
+
     public string Id { get; }
     public string DisplayName { get; internal set; }
 
-    internal Unit(UnitPackage package, string id) => package.values[Id = id] = this;
+    public override string ToString()
+    {
+        return Id;
+    }
 
-    public override string ToString() => Id;
-    protected override Unit AsUnit() => this;
+    protected override Unit AsUnit()
+    {
+        return this;
+    }
 
     public void AddProduct(Unit other, Unit result)
     {
-        this.Products[other] = result;
+        Products[other] = result;
         other.Products[this] = result;
         result.Quotients[this] = other;
         result.Quotients[other] = this;
@@ -166,8 +205,8 @@ public sealed class Unit : AbstractUnit
 
     public void AddQuotient(Unit other, Unit result)
     {
-        this.Quotients[other] = result;
-        this.Quotients[result] = other;
+        Quotients[other] = result;
+        Quotients[result] = other;
         other.Products[result] = this;
         result.Products[other] = this;
     }
@@ -176,7 +215,6 @@ public sealed class Unit : AbstractUnit
 public sealed class UnitPackage
 {
     public static readonly UnitPackage None = new(string.Empty);
-    public string Name { get; }
     private static readonly string DescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
     public readonly ConcurrentDictionary<string, Unit> values = new();
 
@@ -185,7 +223,12 @@ public sealed class UnitPackage
         Name = name;
     }
 
-    public Unit Get(string id) => values.GetOrAdd(id, id => new Unit(this, id));
+    public string Name { get; }
+
+    public Unit Get(string id)
+    {
+        return values.GetOrAdd(id, id => new Unit(this, id));
+    }
 
     public void Load(string file)
     {
@@ -202,6 +245,7 @@ public sealed class UnitPackage
                 unit.DisplayName = line;
                 continue;
             }
+
             if (Regex.Match(line, DescriptorPattern) is not { Success: true } match)
                 throw new Exception("Invalid descriptor: " + line);
             var other = Get(match.Groups[2].Value);
@@ -219,5 +263,8 @@ public sealed class UnitPackage
         }
     }
 
-    public override string ToString() => Name;
+    public override string ToString()
+    {
+        return Name;
+    }
 }

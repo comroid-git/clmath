@@ -304,6 +304,7 @@ public sealed class Component
                         break;
                     default: throw new Exception("invalid state");
                 }
+
                 return new UnitResult(unitX?.ToUnit(ctx!), result).Normalize();
             case Type.Factorial:
                 var yield = 1;
@@ -352,11 +353,14 @@ public sealed class Component
         throw new NotSupportedException(ToString());
     }
 
-    internal SiUnit? ToUnit(MathContext? ctx) => ctx == null || arg == null ? null : new((string)arg!, ctx.GetUnitPackages());
+    internal SiUnit? ToUnit(MathContext? ctx)
+    {
+        return ctx == null || arg == null ? null : new SiUnit((string)arg!, ctx.GetUnitPackages());
+    }
 
     public override string ToString()
     {
-        string str = string.Empty;
+        var str = string.Empty;
         switch (type)
         {
             case Type.Num:

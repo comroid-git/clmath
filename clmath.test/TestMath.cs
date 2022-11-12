@@ -6,8 +6,11 @@ namespace clmath.test;
 public sealed class TestMath
 {
     [SetUp]
-    public void SetUp() => Program.SetUp();
-    
+    public void SetUp()
+    {
+        Program.SetUp();
+    }
+
     [Test]
     public void TestSquare()
     {
@@ -16,7 +19,7 @@ public sealed class TestMath
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
-    
+
     [Test]
     public void TestCubic()
     {
@@ -25,7 +28,7 @@ public sealed class TestMath
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
-    
+
     [Test]
     public void TestFactorial()
     {
@@ -34,7 +37,7 @@ public sealed class TestMath
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
-    
+
     [Test]
     public void TestFraction()
     {

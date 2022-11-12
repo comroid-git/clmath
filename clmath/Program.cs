@@ -36,7 +36,7 @@ public static class Program
         { "rng_i", double.NaN },
         { "rng_d", double.NaN }
     };
-    internal static Dictionary<string, double> constants { get; private set; } = null!;
+
     private static readonly Stack<(Component func, MathContext ctx)> stash = new();
     internal static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
     private static readonly List<string> enabledUnitPacks = new();
@@ -55,15 +55,21 @@ public static class Program
         {
             File.Delete(configFile);
             SaveConfig();
-        } 
+        }
+
         LoadConstants();
         LoadUnits();
     }
 
+    internal static Dictionary<string, double> constants { get; private set; } = null!;
+
     public static CalcMode DRG { get; set; } = CalcMode.Deg;
     internal static bool AutoEval { get; set; } = true;
 
-    public static void SetUp() => CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+    public static void SetUp()
+    {
+        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+    }
 
     private static void SaveConstants(Dictionary<string, double>? values = null)
     {
@@ -94,7 +100,7 @@ public static class Program
             unitPackages[packageName] = package;
         }
     }
-    
+
     private static void SaveConfig()
     {
         using var fs = File.OpenWrite(configFile);
@@ -123,6 +129,7 @@ public static class Program
             var len = BitConverter.ToInt32(Read(fs, sizeof(int)));
             enabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
         }
+
         return true;
     }
 
@@ -299,7 +306,7 @@ public static class Program
         return args.ToList()
             .GetRange(start, args.Length - start)
             .Select(ParseFunc)
-            .Select(fx => (fx, new MathContext(){enabledUnitPacks = enabledUnitPacks}))
+            .Select(fx => (fx, new MathContext { enabledUnitPacks = enabledUnitPacks }))
             .ToArray();
     }
 
@@ -322,7 +329,7 @@ public static class Program
         }
         else
         {
-            ctx = new MathContext(){enabledUnitPacks = enabledUnitPacks};
+            ctx = new MathContext { enabledUnitPacks = enabledUnitPacks };
         }
 
         return (ParseFunc(lnb == -1 ? data : data.Substring(0, lnb)), ctx);
@@ -359,13 +366,13 @@ public static class Program
     {
         if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
         {
-            var res = func.Evaluate(new MathContext(){enabledUnitPacks = enabledUnitPacks});
+            var res = func.Evaluate(new MathContext { enabledUnitPacks = enabledUnitPacks });
             PrintResult(func, res);
         }
         else
         {
             // enter editor mode
-            ctx ??= new MathContext(){enabledUnitPacks = enabledUnitPacks};
+            ctx ??= new MathContext { enabledUnitPacks = enabledUnitPacks };
             while (true)
             {
                 if (_exiting || _dropAll)
@@ -494,10 +501,11 @@ public static class Program
         if (IsInvalidArgumentCount(cmds, 2))
             return;
         if (cmds[1] == "unit")
-        { // save as unit
+        {
+            // save as unit
             if (IsInvalidArgumentCount(cmds, 4))
                 return;
-            if (func.type != Component.Type.Frac 
+            if (func.type != Component.Type.Frac
                 || (func.type == Component.Type.Op &&
                     func.op is not Component.Operator.Multiply or Component.Operator.Divide)
                 || func.x?.type != Component.Type.Var || func.y?.type != Component.Type.Var)
@@ -505,12 +513,14 @@ public static class Program
                 Console.WriteLine($"Error: Cannot convert operation {func} to a unit");
                 return;
             }
+
             var pkg = unitPackages.GetOrAdd(cmds[2], id => new UnitPackage(id));
             var result = pkg.Get(cmds[3]);
             var unitA = func.x?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
             var unitB = func.y?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
-            
-            if (func.type == Component.Type.Frac || (func.type == Component.Type.Op && func.op == Component.Operator.Divide))
+
+            if (func.type == Component.Type.Frac ||
+                (func.type == Component.Type.Op && func.op == Component.Operator.Divide))
             {
                 unitA.AddQuotient(unitB, result);
                 unitB.AddQuotient(unitA, result);
@@ -520,8 +530,12 @@ public static class Program
                 unitA.AddProduct(unitB, result);
                 unitB.AddProduct(unitA, result);
             }
-            else throw new Exception("Assertion failure");
-        } else
+            else
+            {
+                throw new Exception("Assertion failure");
+            }
+        }
+        else
         {
             var data = f ?? func.ToString();
             if (cmds.Length > 2 && cmds[2] == "-y")
@@ -623,6 +637,7 @@ public static class Program
                     Console.WriteLine("No saved functions");
                     break;
                 }
+
                 Console.WriteLine("Available functions:");
                 foreach (var file in funcs)
                     Console.WriteLine(
@@ -635,6 +650,7 @@ public static class Program
                     Console.WriteLine("No available constants");
                     break;
                 }
+
                 Console.WriteLine("Available constants:");
                 foreach (var (key, value) in constants)
                     Console.WriteLine($"\t{key}\t= {value}");
@@ -646,6 +662,7 @@ public static class Program
                     Console.WriteLine("No functions in stash");
                     break;
                 }
+
                 Console.WriteLine("Stashed Functions:");
                 var i = 0;
                 foreach (var (fx, ctx) in stash)
@@ -661,8 +678,9 @@ public static class Program
                     Console.WriteLine("No unit packs are enabled");
                     break;
                 }
+
                 Console.WriteLine("Enabled unit packs:");
-                foreach (var pack in enabledUnitPacks) 
+                foreach (var pack in enabledUnitPacks)
                     Console.WriteLine($"\t- {pack}");
                 break;
             case "packs":
@@ -672,12 +690,14 @@ public static class Program
                     Console.WriteLine("No unit packages defined");
                     break;
                 }
+
                 Console.WriteLine("Available unit packages:");
                 foreach (var pack in directories)
                 {
                     var packName = new DirectoryInfo(pack).Name.StripExtension(UnitPackExt);
                     Console.WriteLine($"\t- {packName}");
                 }
+
                 break;
             case "units":
                 if (IsInvalidArgumentCount(cmds, 3))
@@ -687,12 +707,14 @@ public static class Program
                     Console.WriteLine($"Error: Unit pack with name {cmds[2]} was not found");
                     break;
                 }
+
                 var package = unitPackages[cmds[2]];
                 if (package.values.IsEmpty)
                 {
                     Console.WriteLine("No units loaded");
                     break;
                 }
+
                 Console.WriteLine($"Units in package '{package.Name}':");
                 foreach (var unit in package.values.Values)
                 {
@@ -702,6 +724,7 @@ public static class Program
                     foreach (var (dividend, result) in unit.Quotients)
                         Console.WriteLine($"\t\t{unit} = {result} * {dividend}");
                 }
+
                 break;
             default:
                 Console.WriteLine(
@@ -720,11 +743,13 @@ public static class Program
             Console.WriteLine($"Unit pack {desiredPack} does not exist");
             return;
         }
+
         if (newState == enabledUnitPacks.Contains(desiredPack))
         {
             Console.WriteLine($"Unit pack {desiredPack} is already " + (newState ? "enabled" : "disabled"));
             return;
         }
+
         if (newState)
             enabledUnitPacks.Add(desiredPack);
         else enabledUnitPacks.Remove(desiredPack);
@@ -927,7 +952,6 @@ public enum CalcMode : byte
 public sealed class MathContext
 {
     public readonly Dictionary<string, Component> var = new();
-    public List<string> enabledUnitPacks { get; init; }= new();
 
     public MathContext() : this(null)
     {
@@ -947,8 +971,13 @@ public sealed class MathContext
                 this.enabledUnitPacks.Add(pack);
     }
 
-    public UnitPackage[] GetUnitPackages() => Program.unitPackages
-        .Where(pkg => enabledUnitPacks.Contains(pkg.Key))
-        .Select(pkg => pkg.Value)
-        .ToArray();
+    public List<string> enabledUnitPacks { get; init; } = new();
+
+    public UnitPackage[] GetUnitPackages()
+    {
+        return Program.unitPackages
+            .Where(pkg => enabledUnitPacks.Contains(pkg.Key))
+            .Select(pkg => pkg.Value)
+            .ToArray();
+    }
 }
