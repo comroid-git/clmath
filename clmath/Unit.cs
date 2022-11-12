@@ -6,7 +6,7 @@ namespace clmath;
 
 public sealed class SiPrefix
 {
-    internal static readonly HashSet<SiPrefix> values = new();
+    internal static readonly List<SiPrefix> values = new();
 
     public static readonly SiPrefix Yocto = new("y", -24);
     public static readonly SiPrefix Zepto = new("z", -21);
@@ -43,9 +43,22 @@ public sealed class SiPrefix
         Factor = Math.Pow(10, exp);
     }
 
-    public double Convert(SiPrefix target, double value) => value / Factor * target.Factor;
+    public double Convert(SiPrefix from, double value) => value / Factor * from.Factor;
 
     public override string ToString() => Id;
+
+    public static UnitResult Minimize(Unit unit, double value)
+    {
+        for (var i = 0; i < values.Count; i++)
+        {
+            var si = values[i];
+            var use = i < values.Count ? values[i] : null;
+
+            if (use != null && value >= use.Factor && value <= si.Factor)
+                return new UnitResult(new SiUnit(si, unit), si.Convert(None, value));
+        }
+        return new UnitResult(new SiUnit(None, unit), value);
+    }
 }
 
 public sealed class UnitResult
@@ -66,12 +79,10 @@ public sealed class UnitResult
     public static UnitResult operator *(UnitResult left, UnitResult right)
     {
         var si1 = right.Unit.Prefix;
-        var value = left.Unit.Prefix.Convert(si1, left.Value);
+        var value = si1.Convert(left.Unit.Prefix, left.Value);
         value *= right.Unit.Prefix.Convert(si1, right.Value);
-        var unit = new SiUnit(si1, left.Unit.Multiply(right.Unit));
         //todo find good common unit prefix and convert to it
-        var si2 = si1;
-        return new UnitResult(unit, si1.Convert(si2, value));
+        return SiPrefix.Minimize(left.Unit.Multiply(right.Unit), value);
     }
 
     public static UnitResult operator /(UnitResult left, UnitResult right)
@@ -79,10 +90,8 @@ public sealed class UnitResult
         var si1 = right.Unit.Prefix;
         var value = si1.Convert(left.Unit.Prefix, left.Value);
         value /= right.Unit.Prefix.Convert(si1, right.Value);
-        var unit = new SiUnit(si1, left.Unit.Divide(right.Unit));
         //todo find good common unit prefix and convert to it
-        var si2 = si1;
-        return new UnitResult(unit, si1.Convert(si2, value));
+        return SiPrefix.Minimize(left.Unit.Divide(right.Unit), value);
     }
 
     public override string ToString() => Value.ToString(CultureInfo.InvariantCulture) +

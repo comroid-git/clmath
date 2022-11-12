@@ -38,4 +38,22 @@ public sealed class TestUnit
 
         Assert.AreEqual(output, TestUtil.CalcTest(input));
     }
+
+    [Test]
+    public void TestSiPrefix_1()
+    {
+        const string input = "1[kWh]/1[h]";
+        const string output = "1[kW]";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
+
+    [Test]
+    public void TestSiPrefix_2()
+    {
+        const string input = "1[kWh]/1[kh]";
+        const string output = "1[W]";
+
+        Assert.AreEqual(output, TestUtil.CalcTest(input));
+    }
 }
