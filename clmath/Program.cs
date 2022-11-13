@@ -177,7 +177,7 @@ namespace clmath
             return vars;
         }
 
-        private static (string key, Component value)? ConvertValueFromString(string data)
+        public static (string key, Component value)? ConvertValueFromString(string data)
         {
             if (Regex.Match(data, "([\\w]+)\\s*=\\s*(.+)") is not { Success: true } matcher)
                 return null;
@@ -352,7 +352,7 @@ namespace clmath
             return false;
         }
 
-        private static Component ParseFunc(string f)
+        public static Component ParseFunc(string f)
         {
             var input = new AntlrInputStream(f);
             var lexer = new MathLexer(input);

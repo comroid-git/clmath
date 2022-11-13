@@ -4,4 +4,49 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+    <EditText
+            android:layout_width="339dp"
+            android:layout_height="49dp"
+            android:inputType="none|textNoSuggestions|text"
+            android:ems="10"
+            android:id="@+id/funcInput" android:layout_alignParentEnd="true"
+            android:layout_marginEnd="36dp" android:layout_alignParentStart="true" android:layout_marginStart="36dp"
+            android:layout_marginTop="34dp"
+            android:layout_alignParentTop="true"
+            android:hint="Math input..."/>
+    <Button
+            android:text="Evaluate"
+            android:layout_width="wrap_content"
+            android:layout_height="63dp" android:id="@+id/btnEval"
+            android:layout_alignParentEnd="true" android:layout_marginEnd="126dp"
+            android:layout_marginTop="41dp"
+            android:layout_alignParentStart="true" android:layout_marginStart="128dp"
+            android:textAppearance="@android:style/TextAppearance.Material.Large"
+            android:layout_below="@+id/funcInput"/>
+    <ScrollView
+            android:layout_width="375dp"
+            android:layout_height="208dp" android:layout_marginTop="124dp"
+            android:layout_alignParentStart="true" android:layout_marginStart="16dp"
+            android:layout_alignParentEnd="true"
+            android:layout_marginEnd="19dp" android:layout_below="@+id/btnEval">
+        <LinearLayout android:layout_width="match_parent" android:id="@+id/varsList"
+                      android:layout_height="wrap_content"
+                      android:orientation="vertical">
+            <TextView
+                    android:text="TextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:id="@+id/textView2"/>
+            <TextView
+                    android:text="TextView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" android:id="@+id/textView"/>
+        </LinearLayout>
+    </ScrollView>
+    <TextView
+            android:text="TextView"
+            android:layout_width="381dp"
+            android:layout_height="48dp" android:id="@+id/resultOutput" android:layout_alignParentEnd="true"
+            android:layout_marginEnd="17dp" android:layout_alignParentStart="true" android:layout_marginStart="12dp"
+            android:layout_marginTop="49dp"
+            android:layout_below="@+id/btnEval"/>
 </RelativeLayout>
