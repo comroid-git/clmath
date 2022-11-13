@@ -17,7 +17,8 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>..\icon.ico</ApplicationIcon>
         <LangVersion>preview</LangVersion>
-        <TargetFrameworks>net6.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>net6.0;netcoreapp3.1;netstandard2.1</TargetFrameworks>
+        <OutputType>Exe</OutputType>
     </PropertyGroup>
 
     <ItemGroup>
