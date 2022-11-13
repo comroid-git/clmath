@@ -71,7 +71,7 @@ public sealed class Graph : IDisposable
         {
             fx[i] = funcs[i].fx;
             ctx[i] = new MathContext(funcs[i].ctx);
-            var vars = fx[i].EnumerateVars();
+            var vars = fx[i].EnumerateVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
             if (vars.Count(s => !ctx[i].var.ContainsKey(s)) > 1)
             {
                 Console.WriteLine("Error: More than 1 variable is unset");
