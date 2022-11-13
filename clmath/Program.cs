@@ -65,7 +65,7 @@ namespace clmath
             LoadUnits();
         }
 
-        internal static Dictionary<string, double> constants { get; private set; } = null!;
+        public static Dictionary<string, double> constants { get; private set; } = null!;
 
         public static CalcMode DRG { get; set; } = CalcMode.Deg;
         internal static bool AutoEval { get; set; } = true;
