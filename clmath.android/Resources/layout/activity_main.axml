@@ -23,27 +23,26 @@
             android:layout_alignParentStart="true" android:layout_marginStart="128dp"
             android:textAppearance="@android:style/TextAppearance.Material.Large"
             android:layout_below="@+id/funcInput"/>
+    <TextView
+            android:text="Variables:"
+            android:layout_width="73dp"
+            android:layout_height="wrap_content" android:id="@+id/varsLabel" android:layout_alignParentBottom="true"
+            android:layout_marginBottom="412dp" android:layout_alignParentEnd="true" android:layout_marginEnd="327dp"
+            android:layout_alignParentStart="true" android:layout_marginStart="11dp" android:layout_marginTop="311dp"
+            android:layout_alignParentTop="true"/>
     <ScrollView
             android:layout_width="375dp"
-            android:layout_height="208dp" android:layout_marginTop="124dp"
-            android:layout_alignParentStart="true" android:layout_marginStart="16dp"
+            android:layout_height="208dp" android:layout_marginTop="149dp"
+            android:layout_alignParentStart="true" android:layout_marginStart="13dp"
             android:layout_alignParentEnd="true"
-            android:layout_marginEnd="19dp" android:layout_below="@+id/btnEval">
+            android:layout_marginEnd="22dp" android:layout_below="@+id/btnEval"
+            tools:ignore="SpeakableTextPresentCheck">
         <LinearLayout android:layout_width="match_parent" android:id="@+id/varsList"
                       android:layout_height="wrap_content"
-                      android:orientation="vertical">
-            <TextView
-                    android:text="TextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:id="@+id/textView2"/>
-            <TextView
-                    android:text="TextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" android:id="@+id/textView"/>
-        </LinearLayout>
+                      android:orientation="vertical"/>
     </ScrollView>
     <TextView
-            android:text="TextView"
+            android:text="Evaluate something to get a result..."
             android:layout_width="381dp"
             android:layout_height="48dp" android:id="@+id/resultOutput" android:layout_alignParentEnd="true"
             android:layout_marginEnd="17dp" android:layout_alignParentStart="true" android:layout_marginStart="12dp"
