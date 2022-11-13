@@ -252,7 +252,7 @@ namespace clmath
 
             x?.EnumerateVars().ForEach(vars.Add);
             y?.EnumerateVars().ForEach(vars.Add);
-            return vars;
+            return vars.Distinct().ToList();
         }
 
         public UnitResult Evaluate(MathContext? ctx)
