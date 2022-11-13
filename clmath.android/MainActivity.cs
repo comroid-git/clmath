@@ -30,7 +30,7 @@ namespace clmath.android
             BtnEval = FindViewById<Button>(Resource.Id.btnEval)!;
             ResultOutput = FindViewById<TextView>(Resource.Id.resultOutput);
             VarsList = FindViewById<LinearLayout>(Resource.Id.varsList);
-            
+
             BtnEval.Click += evalFunc;
         }
 
@@ -57,7 +57,12 @@ namespace clmath.android
             var box = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             EditText input;
             box.AddView(new TextView(this) { Text = var, Left = 10 });
-            box.AddView(input = new EditText(this) { Hint = "Value for " + var, Right = 10 });
+            box.AddView(input = new EditText(this)
+            {
+                Text = Ctx.var.ContainsKey(var) ? Ctx.var[var].ToString() : string.Empty,
+                Hint = "Value for " + var,
+                Left = 100
+            });
             input.AfterTextChanged += (sender, _) => ChangeVar(var, (sender as EditText)!.Text);
             return box;
         }
