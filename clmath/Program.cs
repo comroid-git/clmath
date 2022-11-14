@@ -43,9 +43,9 @@ namespace clmath
             { "mem", double.NaN }
         };
 
-        private static readonly Stack<(Component func, MathContext ctx)> stash = new();
-        internal static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
-        private static readonly List<string> enabledUnitPacks = new();
+        public static readonly Stack<(Component func, MathContext ctx)> stash = new();
+        public static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
+        public static readonly List<string> enabledUnitPacks = new();
 
         static Program()
         {
