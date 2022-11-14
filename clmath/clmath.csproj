@@ -23,7 +23,7 @@
 
     <ItemGroup>
         <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
-        <!--<PackageReference Include="Antlr4BuildTasks" Version="12.0.0" PrivateAssets="all" /> todo: https://github.com/kaby76/Antlr4BuildTasks/issues/51-->
+        <PackageReference Include="Antlr4BuildTasks" Version="12.1.0" PrivateAssets="all" />
         <PackageReference Include="Silk.NET.Input" Version="2.16.0" />
         <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0" />
         <PackageReference Include="Silk.NET.Windowing" Version="2.16.0" />
@@ -31,9 +31,7 @@
 
     <ItemGroup>
         <Antlr4 Include="../grammar/Math.g4">
-            <Generator>MSBuild:Compile</Generator>
             <Package>clmath.Antlr</Package>
-            <LibPath>../</LibPath>
             <Listener>False</Listener>
             <Visitor>True</Visitor>
         </Antlr4>
