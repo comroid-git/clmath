@@ -266,6 +266,8 @@ namespace clmath
                 case Type.Var:
                     if (arg is not string name)
                         throw new Exception("Invalid arg: " + arg);
+                    if (name == "mem")
+                        return Program.Mem;
                     if (name.StartsWith("rng"))
                         if (name.EndsWith("i"))
                             return new UnitResult(Program.RNG.Next()).Normalize();

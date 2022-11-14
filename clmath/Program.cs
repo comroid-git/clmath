@@ -12,6 +12,7 @@ namespace clmath
     public static class Program
     {
         public static readonly Random RNG = new();
+        public static UnitResult Mem { get; private set; } = new(0);
         
         private const double factorD2R = Math.PI / 180;
         private const double factorD2G = 1.111111111;
@@ -38,7 +39,8 @@ namespace clmath
             { "e", Math.E },
             { "tau", Math.PI * 2 },
             { "rng_i", double.NaN },
-            { "rng_d", double.NaN }
+            { "rng_d", double.NaN },
+            { "mem", double.NaN }
         };
 
         private static readonly Stack<(Component func, MathContext ctx)> stash = new();
@@ -658,8 +660,12 @@ namespace clmath
                     }
 
                     Console.WriteLine("Available constants:");
-                    foreach (var (key, value) in constants)
+                    foreach (var (key, value) in constants.Where(c => !double.IsNaN(c.Value)))
                         Console.WriteLine($"\t{key}\t= {value}");
+                    Console.WriteLine("Available semiconstants:");
+                    Console.WriteLine("\tmem\t= Previous computation result");
+                    Console.WriteLine("\trng_i\t= Random integer");
+                    Console.WriteLine("\trng_d\t= Random decimal");
 
                     break;
                 case "stash":
@@ -912,6 +918,7 @@ namespace clmath
 
         private static void PrintResult(Component func, UnitResult result, MathContext? ctx = null)
         {
+            Mem = result;
             var funcAlign = func.ToString().Length / 8 + 1;
             var align = Math.Max(1, (ctx?.DumpVariables(funcAlign) ?? 1) - funcAlign);
             var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
