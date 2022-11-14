@@ -30,7 +30,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Antlr4 Include="../grammar/Math.g4">
+        <Antlr4 Include="Math.g4">
             <Package>clmath.Antlr</Package>
             <Listener>False</Listener>
             <Visitor>True</Visitor>
