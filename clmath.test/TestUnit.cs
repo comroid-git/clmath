@@ -9,7 +9,18 @@ namespace clmath.test
         public void SetUp()
         {
             Program.SetUp();
-            // todo fixme: needs static setup of units
+
+            // doesnt matter if these units are already defined; newer information just overrides
+            const string packName = "electric";
+            var pack = Program.unitPackages[packName] = new UnitPackage(packName);
+            var volts = pack.Get("V");
+            var ampere = pack.Get("A");
+            var watts = pack.Get("W");
+            var hours = pack.Get("h");
+            var watthours = pack.Get("Wh");
+            volts.AddProduct(ampere, watts);
+            watthours.AddQuotient(hours, watts);
+            Program.enabledUnitPacks.Add(packName);
         }
 
         [Test]
