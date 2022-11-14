@@ -81,7 +81,7 @@ unit: IDX_L u=word IDX_R;
 expr
     : x=expr lu=unit? POW y=expr            #exprPow
     | l=expr lu=unit? op_1 r=expr ru=unit?  #exprOp1
-    | PAR_L n=expr PAR_R u=unit             #exprPar
+    | PAR_L n=expr PAR_R u=unit?            #exprPar
     | frac u=unit?                          #exprFrac
     | fx u=unit?                            #exprFunc
     | x=expr FACTORIAL u=unit?              #exprFact
