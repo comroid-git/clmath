@@ -21,8 +21,8 @@ jobs:
     - name: Setup Xamarin
       uses: maxim-lobanov/setup-xamarin@v1
       with:
-        mono-version: 6.12.0.188
-        xamarin-android-version: 12.2.8.3
+        mono-version: 6.12
+        xamarin-android-version: 12.2
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
