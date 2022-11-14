@@ -118,14 +118,21 @@ namespace clmath
     {
         protected abstract Unit AsUnit();
 
-        public Unit Multiply(AbstractUnit other)
-        {
-            return AsUnit() == Unit.None ? Unit.None : AsUnit().Products[other.AsUnit()];
-        }
+        public Unit Multiply(AbstractUnit other) => FindCommonUnit(other) ?? AsUnit().Products[other.AsUnit()];
 
-        public Unit Divide(AbstractUnit other)
+        public Unit Divide(AbstractUnit other) => FindCommonUnit(other) ?? AsUnit().Quotients[other.AsUnit()];
+
+        private Unit? FindCommonUnit(AbstractUnit other)
         {
-            return AsUnit() == Unit.None ? Unit.None : AsUnit().Quotients[other.AsUnit()];
+            var it = AsUnit();
+            var ot = other.AsUnit();
+            return (it.Id == string.Empty, ot.Id == string.Empty) switch
+            {
+                (true, true) => Unit.None,
+                (false, true) => it,
+                (true, false) => ot,
+                (_, _) => null
+            };
         }
     }
 
