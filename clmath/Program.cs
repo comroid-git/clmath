@@ -238,71 +238,78 @@ namespace clmath
                 func = CleanupString(func);
                 var cmds = func.Split(" ");
 
-                switch (cmds[0])
+                try
                 {
-                    case "": break;
-                    case "exit": return;
-                    case "help":
-                        Console.WriteLine($"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
-                        Console.WriteLine("Available commands:");
-                        Console.WriteLine("\thelp\t\t\t\tShows this text");
-                        Console.WriteLine("\texit\t\t\t\tCloses the program");
-                        Console.WriteLine("\tset <const>\t\t\tDefines a constant");
-                        Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
-                        Console.WriteLine("\tlist <target>\t\t\tLists things");
-                        Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
-                        Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
-                        Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
-                        Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
-                        Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
-                        Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
-                        Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
-                        Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
-                        Console.WriteLine("\tmemmode <fifo/lifo>\t\tSets the memory mode to FIFO/LIFO");
-                        Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
-                        Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
-                        Console.WriteLine("\nEnter a function to start evaluating");
-                        break;
-                    case "set":
-                        CmdSet(func, cmds);
-                        break;
-                    case "unset":
-                        CmdUnset(cmds);
-                        break;
-                    case "list":
-                        CmdList(BaseContext, cmds);
-                        break;
-                    case "enable" or "disable":
-                        CmdToggleState(cmds, cmds[0] == "enable");
-                        break;
-                    case "load":
-                        CmdLoad(cmds);
-                        break;
-                    case "mv" or "rename":
-                        CmdMove(cmds);
-                        break;
-                    case "rm" or "delete":
-                        CmdDelete(cmds);
-                        break;
-                    case "restore":
-                        CmdRestore(cmds);
-                        break;
-                    case "clear":
-                        CmdClearTarget(BaseContext, cmds);
-                        break;
-                    case "mode":
-                        CmdMode(cmds);
-                        break;
-                    case "solve":
-                        var f = CreateArgsFuncs(3, cmds)[0];
-                        CmdSolve(cmds, null, f.fx, f.ctx);
-                        break;
-                    case "graph":
-                        StartGraph(cmds.Length == 1 ? stash.ToArray() : CreateArgsFuncs(1, cmds));
-                        break;
-                    default:
-                        EvalFunc(func);
-                        break;
+                    switch (cmds[0])
+                    {
+                        case "": break;
+                        case "exit": return;
+                        case "help":
+                            Console.WriteLine($"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
+                            Console.WriteLine("Available commands:");
+                            Console.WriteLine("\thelp\t\t\t\tShows this text");
+                            Console.WriteLine("\texit\t\t\t\tCloses the program");
+                            Console.WriteLine("\tset <const>\t\t\tDefines a constant");
+                            Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
+                            Console.WriteLine("\tlist <target>\t\t\tLists things");
+                            Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
+                            Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
+                            Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
+                            Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
+                            Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
+                            Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
+                            Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
+                            Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
+                            Console.WriteLine("\tmemmode <fifo/lifo>\t\tSets the memory mode to FIFO/LIFO");
+                            Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
+                            Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
+                            Console.WriteLine("\nEnter a function to start evaluating");
+                            break;
+                        case "set":
+                            CmdSet(func, cmds);
+                            break;
+                        case "unset":
+                            CmdUnset(cmds);
+                            break;
+                        case "list":
+                            CmdList(BaseContext, cmds);
+                            break;
+                        case "enable" or "disable":
+                            CmdToggleState(cmds, cmds[0] == "enable");
+                            break;
+                        case "load":
+                            CmdLoad(cmds);
+                            break;
+                        case "mv" or "rename":
+                            CmdMove(cmds);
+                            break;
+                        case "rm" or "delete":
+                            CmdDelete(cmds);
+                            break;
+                        case "restore":
+                            CmdRestore(cmds);
+                            break;
+                        case "clear":
+                            CmdClearTarget(BaseContext, cmds);
+                            break;
+                        case "mode":
+                            CmdMode(cmds);
+                            break;
+                        case "solve":
+                            var f = CreateArgsFuncs(3, cmds)[0];
+                            CmdSolve(cmds, null, f.fx, f.ctx);
+                            break;
+                        case "graph":
+                            StartGraph(cmds.Length == 1 ? stash.ToArray() : CreateArgsFuncs(1, cmds));
+                            break;
+                        default:
+                            EvalFunc(func);
+                            break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error: " + e.Message);
                 }
             }
         }
@@ -389,93 +396,103 @@ namespace clmath
                     var cmd = Console.ReadLine()!;
                     cmd = CleanupString(cmd);
 
-                    if (ConvertValueFromString(cmd) is { } result)
+                    try
                     {
-                        var key = result.key;
-                        var value = result.value;
-                        if (value.EnumerateVars().Contains(key))
-                            Console.WriteLine($"Error: Variable {key} cannot use itself");
-                        else if (constants.ContainsKey(key))
-                            Console.WriteLine($"Error: Cannot redefine {key}");
-                        else ctx[key] = value;
-
-                        if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
-                            PrintResult(func, func.Evaluate(ctx), ctx);
-                    }
-                    else
-                    {
-                        var cmds = cmd.Split(" ");
-                        switch (cmds[0])
+                        if (ConvertValueFromString(cmd) is { } result)
                         {
-                            case "drop":
-                                _dropAll = cmds[^1] == "all";
-                                return;
-                            case "exit":
-                                _exiting = true;
-                                return;
-                            case "help":
-                                Console.WriteLine($"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
-                                Console.WriteLine("Available commands:");
-                                Console.WriteLine("\thelp\t\t\t\tShows this text");
-                                Console.WriteLine("\texit\t\t\t\tCloses the program");
-                                Console.WriteLine("\tdrop\t\t\t\tDrops the current function");
-                                Console.WriteLine("\tclear [var]\t\t\tClears all variables or just one from the cache");
-                                Console.WriteLine("\tdump\t\t\t\tPrints all variables in the cache");
-                                Console.WriteLine("\tlist <target>\t\t\tLists things");
-                                Console.WriteLine(
-                                    "\tload <func>\t\t\tLoads a function from disk; the current function is kept in a lower execution context");
-                                Console.WriteLine(
-                                    "\tsave <name>\t\t\tSaves the current function with the given name; append '-y' to store current variables as well");
-                                Console.WriteLine("\tstash\t\t\t\tStores the function in stash");
-                                Console.WriteLine(
-                                    "\trestore <id>\t\t\tRestore another function; the current function is kept in a lower execution context");
-                                Console.WriteLine("\tmode <D/R/G>\t\t\tChanges calculation mode to Deg/Rad/Grad");
-                                Console.WriteLine(
-                                    "\tsolve <var> <lhs>\t\tSolves the function after the given variable");
-                                Console.WriteLine("\tgraph\t\t\t\tDisplays the function in a 2D graph");
-                                Console.WriteLine(
-                                    "\teval\t\t\t\tEvaluates the function, also achieved by just pressing return");
-                                Console.WriteLine("\nSet variables with an equation (example: 'x = 5' or 'y = x * 2')");
-                                break;
-                            case "dump":
-                                DumpVariables(ctx, func.ToString().Length / 8 + 1);
-                                break;
-                            case "list":
-                                CmdList(ctx, cmds);
-                                break;
-                            case "load":
-                                CmdLoad(cmds);
-                                break;
-                            case "save":
-                                CmdSave(cmds, f, func, ctx);
-                                break;
-                            case "clear":
-                                CmdClearVar(cmds, ctx);
-                                break;
-                            case "stash":
-                                stash.Push((func, ctx));
-                                return;
-                            case "restore":
-                                CmdRestore(cmds);
-                                break;
-                            case "mode":
-                                CmdMode(cmds);
-                                break;
-                            case "solve":
-                                CmdSolve(cmds, null, func, ctx);
-                                break;
-                            case "graph":
-                                stash.Push((func, ctx));
-                                StartGraph(stash.ToArray());
-                                stash.Pop();
-                                break;
-                            case "eval":
-                                CmdEval(func, ctx);
-                                break;
-                            default:
-                                Console.WriteLine("Error: Unknown command; type 'help' for a list of commands");
-                                break;
+                            var key = result.key;
+                            var value = result.value;
+                            if (value.EnumerateVars().Contains(key))
+                                Console.WriteLine($"Error: Variable {key} cannot use itself");
+                            else if (constants.ContainsKey(key))
+                                Console.WriteLine($"Error: Cannot redefine {key}");
+                            else ctx[key] = value;
+
+                            if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
+                                PrintResult(func, func.Evaluate(ctx), ctx);
                         }
+                        else
+                        {
+                            var cmds = cmd.Split(" ");
+                            switch (cmds[0])
+                            {
+                                case "drop":
+                                    _dropAll = cmds[^1] == "all";
+                                    return;
+                                case "exit":
+                                    _exiting = true;
+                                    return;
+                                case "help":
+                                    Console.WriteLine(
+                                        $"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
+                                    Console.WriteLine("Available commands:");
+                                    Console.WriteLine("\thelp\t\t\t\tShows this text");
+                                    Console.WriteLine("\texit\t\t\t\tCloses the program");
+                                    Console.WriteLine("\tdrop\t\t\t\tDrops the current function");
+                                    Console.WriteLine(
+                                        "\tclear [var]\t\t\tClears all variables or just one from the cache");
+                                    Console.WriteLine("\tdump\t\t\t\tPrints all variables in the cache");
+                                    Console.WriteLine("\tlist <target>\t\t\tLists things");
+                                    Console.WriteLine(
+                                        "\tload <func>\t\t\tLoads a function from disk; the current function is kept in a lower execution context");
+                                    Console.WriteLine(
+                                        "\tsave <name>\t\t\tSaves the current function with the given name; append '-y' to store current variables as well");
+                                    Console.WriteLine("\tstash\t\t\t\tStores the function in stash");
+                                    Console.WriteLine(
+                                        "\trestore <id>\t\t\tRestore another function; the current function is kept in a lower execution context");
+                                    Console.WriteLine("\tmode <D/R/G>\t\t\tChanges calculation mode to Deg/Rad/Grad");
+                                    Console.WriteLine(
+                                        "\tsolve <var> <lhs>\t\tSolves the function after the given variable");
+                                    Console.WriteLine("\tgraph\t\t\t\tDisplays the function in a 2D graph");
+                                    Console.WriteLine(
+                                        "\teval\t\t\t\tEvaluates the function, also achieved by just pressing return");
+                                    Console.WriteLine(
+                                        "\nSet variables with an equation (example: 'x = 5' or 'y = x * 2')");
+                                    break;
+                                case "dump":
+                                    DumpVariables(ctx, func.ToString().Length / 8 + 1);
+                                    break;
+                                case "list":
+                                    CmdList(ctx, cmds);
+                                    break;
+                                case "load":
+                                    CmdLoad(cmds);
+                                    break;
+                                case "save":
+                                    CmdSave(cmds, f, func, ctx);
+                                    break;
+                                case "clear":
+                                    CmdClearVar(cmds, ctx);
+                                    break;
+                                case "stash":
+                                    stash.Push((func, ctx));
+                                    return;
+                                case "restore":
+                                    CmdRestore(cmds);
+                                    break;
+                                case "mode":
+                                    CmdMode(cmds);
+                                    break;
+                                case "solve":
+                                    CmdSolve(cmds, null, func, ctx);
+                                    break;
+                                case "graph":
+                                    stash.Push((func, ctx));
+                                    StartGraph(stash.ToArray());
+                                    stash.Pop();
+                                    break;
+                                case "eval":
+                                    CmdEval(func, ctx);
+                                    break;
+                                default:
+                                    Console.WriteLine("Error: Unknown command; type 'help' for a list of commands");
+                                    break;
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
             }
