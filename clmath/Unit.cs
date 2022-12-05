@@ -73,6 +73,7 @@ namespace clmath
 
     public sealed class UnitResult
     {
+        public static readonly UnitResult Zero = new(0);
         public readonly SiUnit Unit;
         public readonly double Value;
 

@@ -20,7 +20,7 @@ namespace clmath.test
             var watthours = pack.Get("Wh");
             volts.AddProduct(ampere, watts);
             watthours.AddQuotient(hours, watts);
-            Program.enabledUnitPacks.Add(packName);
+            Program.BaseContext.EnabledUnitPacks.Add(packName);
         }
 
         [Test]

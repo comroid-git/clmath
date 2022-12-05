@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Collections;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -12,7 +13,7 @@ namespace clmath
     public static class Program
     {
         public static readonly Random RNG = new();
-        public static UnitResult Mem { get; private set; } = new(0);
+        public static readonly MathContext BaseContext = new(null);
         
         private const double factorD2R = Math.PI / 180;
         private const double factorD2G = 1.111111111;
@@ -39,13 +40,11 @@ namespace clmath
             { "e", Math.E },
             { "tau", Math.PI * 2 },
             { "rng_i", double.NaN },
-            { "rng_d", double.NaN },
-            { "mem", double.NaN }
+            { "rng_d", double.NaN }
         };
 
         public static readonly Stack<(Component func, MathContext ctx)> stash = new();
         public static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
-        public static readonly List<string> enabledUnitPacks = new();
 
         static Program()
         {
@@ -70,7 +69,7 @@ namespace clmath
         public static Dictionary<string, double> constants { get; private set; } = null!;
 
         public static CalcMode DRG { get; set; } = CalcMode.Deg;
-        internal static bool AutoEval { get; set; } = true;
+        public static bool AutoEval { get; set; } = true;
 
         public static void SetUp()
         {
@@ -113,8 +112,8 @@ namespace clmath
             fs.Write(BitConverter.GetBytes(ConfigVersion));
             fs.Write(new[] { (byte)DRG });
             fs.Write(BitConverter.GetBytes(AutoEval));
-            fs.Write(BitConverter.GetBytes(enabledUnitPacks.Count));
-            foreach (var pack in enabledUnitPacks)
+            fs.Write(BitConverter.GetBytes(BaseContext.EnabledUnitPacks.Count));
+            foreach (var pack in BaseContext.EnabledUnitPacks)
             {
                 var buffer = Encoding.ASCII.GetBytes(pack);
                 fs.Write(BitConverter.GetBytes(buffer.Length));
@@ -133,7 +132,7 @@ namespace clmath
             for (; enabledPackCount > 0; enabledPackCount--)
             {
                 var len = BitConverter.ToInt32(Read(fs, sizeof(int)));
-                enabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
+                BaseContext.EnabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
             }
 
             return true;
@@ -147,8 +146,7 @@ namespace clmath
             return buf;
         }
 
-        private static string ConvertValuesToString(Dictionary<string, Component> values,
-            Func<string, bool>? skip = null)
+        private static string ConvertValuesToString(IEnumerable<KeyValuePair<string, Component>> values, Func<string, bool>? skip = null)
         {
             skip ??= _ => false;
             var txt = string.Empty;
@@ -260,6 +258,7 @@ namespace clmath
                         Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
                         Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
                         Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
+                        Console.WriteLine("\tmemmode <fifo/lifo>\t\tSets the memory mode to FIFO/LIFO");
                         Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
                         Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
                         Console.WriteLine("\nEnter a function to start evaluating");
@@ -271,7 +270,7 @@ namespace clmath
                         CmdUnset(cmds);
                         break;
                     case "list":
-                        CmdList(cmds);
+                        CmdList(BaseContext, cmds);
                         break;
                     case "enable" or "disable":
                         CmdToggleState(cmds, cmds[0] == "enable");
@@ -289,7 +288,7 @@ namespace clmath
                         CmdRestore(cmds);
                         break;
                     case "clear":
-                        CmdClearTarget(cmds);
+                        CmdClearTarget(BaseContext, cmds);
                         break;
                     case "mode":
                         CmdMode(cmds);
@@ -313,7 +312,7 @@ namespace clmath
             return args.ToList()
                 .GetRange(start, args.Length - start)
                 .Select(ParseFunc)
-                .Select(fx => (fx, new MathContext { enabledUnitPacks = enabledUnitPacks }))
+                .Select(fx => (fx, new MathContext(BaseContext)))
                 .ToArray();
         }
 
@@ -332,11 +331,13 @@ namespace clmath
             if (lnb != -1)
             {
                 var vars = ConvertValuesFromString(data.Substring(lnb + 1, data.Length - lnb - 2));
-                ctx = new MathContext(vars, enabledUnitPacks);
+                ctx = new MathContext(BaseContext);
+                foreach (var (key, value) in vars)
+                    ctx[key] = value;
             }
             else
             {
-                ctx = new MathContext { enabledUnitPacks = enabledUnitPacks };
+                ctx = new MathContext(BaseContext);
             }
 
             return (ParseFunc(lnb == -1 ? data : data.Substring(0, lnb)), ctx);
@@ -366,20 +367,19 @@ namespace clmath
         private static void EvalFunc(string f)
         {
             var fx = ParseFunc(f);
-            EvalFunc(fx, fx.ToString());
+            EvalFunc(fx, BaseContext, fx.ToString());
         }
 
-        private static void EvalFunc(Component func, string? f = null, MathContext? ctx = null)
+        private static void EvalFunc(Component func, MathContext ctx, string? f = null)
         {
             if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
             {
-                var res = func.Evaluate(new MathContext { enabledUnitPacks = enabledUnitPacks });
-                PrintResult(func, res);
+                var res = func.Evaluate(new MathContext(BaseContext));
+                PrintResult(func, res, BaseContext, false);
             }
             else
             {
                 // enter editor mode
-                ctx ??= new MathContext { enabledUnitPacks = enabledUnitPacks };
                 while (true)
                 {
                     if (_exiting || _dropAll)
@@ -397,10 +397,10 @@ namespace clmath
                             Console.WriteLine($"Error: Variable {key} cannot use itself");
                         else if (constants.ContainsKey(key))
                             Console.WriteLine($"Error: Cannot redefine {key}");
-                        else ctx.var[key] = value;
+                        else ctx[key] = value;
 
                         if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
-                            PrintResult(func, func.Evaluate(ctx));
+                            PrintResult(func, func.Evaluate(ctx), ctx);
                     }
                     else
                     {
@@ -441,7 +441,7 @@ namespace clmath
                                 DumpVariables(ctx, func.ToString().Length / 8 + 1);
                                 break;
                             case "list":
-                                CmdList(cmds);
+                                CmdList(ctx, cmds);
                                 break;
                             case "load":
                                 CmdLoad(cmds);
@@ -501,7 +501,7 @@ namespace clmath
             }
 
             var result = new Solver(cmds[^1] == "-v").Solve(func, lhs, target);
-            EvalFunc(result);
+            EvalFunc(result, ctx);
         }
 
         private static void CmdSave(string[] cmds, string? f, Component func, MathContext ctx)
@@ -547,7 +547,7 @@ namespace clmath
             {
                 var data = f ?? func.ToString();
                 if (cmds.Length > 2 && cmds[2] == "-y")
-                    data += $"\n{ConvertValuesToString(ctx.var, globalConstants.ContainsKey)}";
+                    data += $"\n{ConvertValuesToString(ctx.Vars(), globalConstants.ContainsKey)}";
                 var path = Path.Combine(dir, cmds[1] + FuncExt);
                 File.WriteAllText(path, data);
                 Console.WriteLine($"Function saved as {cmds[1]}");
@@ -558,18 +558,18 @@ namespace clmath
         {
             if (cmds.Length > 1)
             {
-                if (!ctx.var.ContainsKey(cmds[1]))
+                if (ctx.Vars().All(pair => pair.Key != cmds[1]))
                 {
                     Console.WriteLine($"Error: Variable {cmds[1]} not found");
                     return;
                 }
 
-                ctx.var.Remove(cmds[1]);
+                ctx[cmds[1]] = null;
                 Console.WriteLine($"Variable {cmds[1]} deleted");
             }
             else
             {
-                ctx.var.Clear();
+                ctx.ClearVars();
             }
         }
 
@@ -627,9 +627,9 @@ namespace clmath
             SaveConstants();
         }
 
-        private static void CmdList(string[] cmds)
+        private static void CmdList(MathContext ctx, string[] cmds)
         {
-            const string options = "'funcs', 'constants', 'stash', 'enabled', 'packs' and 'units <pack>'";
+            const string options = "'funcs', 'constants', 'mem', 'stash', 'enabled', 'packs' and 'units <pack>'";
             if (cmds.Length == 1)
             {
                 Console.WriteLine("Error: Listing target unspecified; options are " + options);
@@ -668,6 +668,19 @@ namespace clmath
                     Console.WriteLine("\trng_d\t= Random decimal");
 
                     break;
+                case "mem":
+                    if (!ctx.Mem().Any())
+                    {
+                        Console.WriteLine("No values in memory");
+                        break;
+                    }
+
+                    Console.WriteLine("Variables in Memory:");
+                    var i = 0;
+                    foreach (var value in ctx.Mem()) 
+                        Console.WriteLine($"\tmem[{i++}]\t= {value}");
+
+                    break;
                 case "stash":
                     if (stash.Count == 0)
                     {
@@ -676,23 +689,23 @@ namespace clmath
                     }
 
                     Console.WriteLine("Stashed Functions:");
-                    var i = 0;
-                    foreach (var (fx, ctx) in stash)
+                    var i0 = 0;
+                    foreach (var (fx, ctx0) in stash)
                     {
-                        Console.WriteLine($"\tstash[{i++}]\t= {fx}");
-                        ctx.DumpVariables("stash[#]".Length / 8 + 1, false);
+                        Console.WriteLine($"\tstash[{i0++}]\t= {fx}");
+                        ctx0.DumpVariables("stash[#]".Length / 8 + 1, false);
                     }
 
                     break;
                 case "enabled":
-                    if (enabledUnitPacks.Count == 0)
+                    if (BaseContext.EnabledUnitPacks.Count == 0)
                     {
                         Console.WriteLine("No unit packs are enabled");
                         break;
                     }
 
                     Console.WriteLine("Enabled unit packs:");
-                    foreach (var pack in enabledUnitPacks)
+                    foreach (var pack in BaseContext.EnabledUnitPacks)
                         Console.WriteLine($"\t- {pack}");
                     break;
                 case "packs":
@@ -756,15 +769,15 @@ namespace clmath
                 return;
             }
 
-            if (newState == enabledUnitPacks.Contains(desiredPack))
+            if (newState == BaseContext.EnabledUnitPacks.Contains(desiredPack))
             {
                 Console.WriteLine($"Unit pack {desiredPack} is already " + (newState ? "enabled" : "disabled"));
                 return;
             }
 
             if (newState)
-                enabledUnitPacks.Add(desiredPack);
-            else enabledUnitPacks.Remove(desiredPack);
+                BaseContext.EnabledUnitPacks.Add(desiredPack);
+            else BaseContext.EnabledUnitPacks.Remove(desiredPack);
             Console.WriteLine($"Unit pack {desiredPack} now " + (newState ? "enabled" : "disabled"));
         }
 
@@ -840,7 +853,7 @@ namespace clmath
             EvalFunc(entry.func, ctx: entry.ctx);
         }
 
-        private static void CmdClearTarget(string[] cmds)
+        private static void CmdClearTarget(MathContext ctx, string[] cmds)
         {
             if (IsInvalidArgumentCount(cmds, 2))
                 return;
@@ -850,8 +863,12 @@ namespace clmath
                     stash.Clear();
                     Console.WriteLine("Stash cleared");
                     break;
+                case "mem":
+                    ctx.ClearMem();
+                    Console.WriteLine("Memory cleared");
+                    break;
                 default:
-                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'stash'");
+                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'stash' and 'mem'");
                     break;
             }
         }
@@ -881,9 +898,12 @@ namespace clmath
         private static List<string> FindMissingVariables(Component func, MathContext ctx)
         {
             var missing = new List<string>();
-            foreach (var var in ctx.var.Values.Append(func).SelectMany(it => it.EnumerateVars())
+            foreach (var var in ctx.Vars()
+                         .Select(x => x.Value)
+                         .Append(func)
+                         .SelectMany(it => it.EnumerateVars())
                          .Distinct())
-                if (!ctx.var.ContainsKey(var))
+                if (ctx.Vars().All(x => x.Key != var))
                     missing.Add(var);
             missing.RemoveAll(constants.ContainsKey);
             return missing;
@@ -897,15 +917,15 @@ namespace clmath
 
         private static int DumpVariables(this MathContext ctx, int alignBase = 1, bool shouldError = true)
         {
-            if (ctx.var.Count == 0)
+            if (!ctx.Vars().Any())
             {
                 if (shouldError)
                     Console.WriteLine("Error: No variables are set");
                 return 1;
             }
 
-            var maxAlign = ctx.var.Keys.Max(key => key.Length) / 8;
-            foreach (var (key, val) in ctx.var)
+            var maxAlign = ctx.Vars().Select(x => x.Key).Max(key => key.Length) / 8;
+            foreach (var (key, val) in ctx.Vars())
             {
                 var align = Math.Max(maxAlign > 0 ? maxAlign - alignBase : alignBase,
                     maxAlign - (key.Length / 8 + 1) + alignBase);
@@ -916,11 +936,11 @@ namespace clmath
             return maxAlign;
         }
 
-        private static void PrintResult(Component func, UnitResult result, MathContext? ctx = null)
+        private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
         {
-            Mem = result;
+            ctx[0] = result;
             var funcAlign = func.ToString().Length / 8 + 1;
-            var align = Math.Max(1, (ctx?.DumpVariables(funcAlign) ?? 1) - funcAlign);
+            var align = Math.Max(1, (ctx?.DumpVariables(funcAlign, shouldError) ?? 1) - funcAlign);
             var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
             Console.WriteLine($"\t{func}{spacer}= {result}");
         }
@@ -964,32 +984,53 @@ namespace clmath
 
     public sealed class MathContext
     {
-        public readonly Dictionary<string, Component> var = new();
+        private readonly MathContext? _parent;
+        private readonly Dictionary<string, Component> var = new();
+        private readonly Stack<UnitResult> mem = new();
+        public readonly List<string> EnabledUnitPacks = new();
 
-        public MathContext() : this(null)
+        public MathContext(MathContext? parent)
         {
+            _parent = parent;
         }
 
-        public MathContext(MathContext? copy) : this(copy?.var, copy?.enabledUnitPacks)
+        public Component? this[string key]
         {
+            get => var.ContainsKey(key) ? var[key] : _parent?[key] ?? throw new Exception($"Variable {key} not found");
+            set
+            {
+                if (value == null)
+                {
+                    var.Remove(key);
+                    if (_parent != null)
+                        _parent[key] = null;
+                }
+                else var[key] = value;
+            }
         }
 
-        public MathContext(Dictionary<string, Component>? copy, List<string>? enabledUnitPacks)
+        public UnitResult this[int i]
         {
-            if (copy != null)
-                foreach (var (key, value) in copy)
-                    var[key] = value;
-            if (enabledUnitPacks != null)
-                foreach (var pack in enabledUnitPacks)
-                    this.enabledUnitPacks.Add(pack);
+            get => i < mem.Count ? mem.ToArray()[i] : _parent?[i - mem.Count] ?? UnitResult.Zero;
+            set
+            {
+                if (mem.Count == 0 || mem.Peek() != value)
+                    mem.Push(value);
+            }
         }
 
-        public List<string> enabledUnitPacks { get; set; } = new();
+        public IEnumerable<KeyValuePair<string, Component>> Vars() => var.Concat(_parent?.Vars() ?? ArraySegment<KeyValuePair<string, Component>>.Empty);
+
+        public void ClearVars() => var.Clear();
+
+        public IEnumerable<UnitResult> Mem() => mem.Concat(_parent?.Mem() ?? ArraySegment<UnitResult>.Empty);
+
+        public void ClearMem() => mem.Clear();
 
         public UnitPackage[] GetUnitPackages()
         {
             return Program.unitPackages
-                .Where(pkg => enabledUnitPacks.Contains(pkg.Key))
+                .Where(pkg => EnabledUnitPacks.Contains(pkg.Key))
                 .Select(pkg => pkg.Value)
                 .ToArray();
         }

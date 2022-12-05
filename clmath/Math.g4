@@ -36,6 +36,7 @@ ROOT: 'sqrt' | 'root';
 POW: '^';
 FACTORIAL: '!';
 FRAC: 'frac';
+MEM: 'mem';
 
 PAR_L: '(';
 PAR_R: ')';
@@ -88,6 +89,7 @@ expr
     | root u=unit?                          #exprRoot
     | abs u=unit?                           #exprAbs
     | num u=unit?                           #exprNum
+    | MEM (IDX_L n=expr IDX_R)?             #exprMem
     | word                                  #exprId
     | eval                                  #exprEval
     | l=expr lu=unit? op_2 r=expr ru=unit?  #exprOp2

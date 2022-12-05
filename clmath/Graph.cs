@@ -73,20 +73,20 @@ namespace clmath
                 fx[i] = funcs[i].fx;
                 ctx[i] = new MathContext(funcs[i].ctx);
                 var vars = fx[i].EnumerateVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
-                if (vars.Count(s => !ctx[i].var.ContainsKey(s)) > 1)
+                if (vars.Count(s => ctx[i].Vars().All(y => y.Key != s)) > 1)
                 {
                     Console.WriteLine("Error: More than 1 variable is unset");
                     return;
                 }
 
-                var key = vars.FirstOrDefault(s => !ctx[i].var.ContainsKey(s));
+                var key = vars.FirstOrDefault(s => ctx[i].Vars().All(y => y.Key != s));
                 if (key == null)
                 {
                     key = vars[0];
                     Console.WriteLine($"Error: No variable is unset; falling back to {key}");
                 }
 
-                ctx[i].var[key] = x[i] = new Component { type = Component.Type.Num, arg = (double)0 };
+                ctx[i][key] = x[i] = new Component { type = Component.Type.Num, arg = (double)0 };
             }
 
             window.Title = "2D Graph";

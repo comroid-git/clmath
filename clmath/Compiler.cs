@@ -28,6 +28,11 @@ namespace clmath
             return new Component { type = Component.Type.Var, arg = context.GetText() };
         }
 
+        public override Component VisitExprMem(MathParser.ExprMemContext context)
+        {
+            return new Component { type = Component.Type.Mem, x = context.n != null ? Visit(context.n) : null };
+        }
+
         public override Component VisitExprFrac(MathParser.ExprFracContext context)
         {
             return new Component
@@ -224,6 +229,7 @@ namespace clmath
             Eval,
             EvalVar,
             Op,
+            Mem,
             Parentheses,
             Unit
         }
@@ -266,8 +272,6 @@ namespace clmath
                 case Type.Var:
                     if (arg is not string name)
                         throw new Exception("Invalid arg: " + arg);
-                    if (name == "mem")
-                        return Program.Mem;
                     if (name.StartsWith("rng"))
                         if (name.EndsWith("i"))
                             return new UnitResult(Program.RNG.Next()).Normalize();
@@ -276,7 +280,9 @@ namespace clmath
                         else throw new Exception("Invalid random: " + arg);
                     if (Program.constants.TryGetValue(name, out var val))
                         return new UnitResult(val).Normalize();
-                    return ctx!.var[name].Evaluate(ctx);
+                    return ctx![name].Evaluate(ctx);
+                case Type.Mem:
+                    return ctx![(int?)x?.Value ?? 0];
                 case Type.FuncX:
                     double result;
                     switch (func)
@@ -346,10 +352,10 @@ namespace clmath
                     if (Program.LoadFunc(arg!.ToString()!) is not { } res)
                         return new UnitResult(unitX?.ToUnit(ctx!), double.NaN).Normalize();
                     var subCtx = new MathContext(res.ctx);
-                    foreach (var (key, value) in ctx!.var)
-                        subCtx.var[key] = value;
+                    foreach (var (key, value) in ctx!.Vars())
+                        subCtx[key] = value;
                     foreach (var var in args)
-                        subCtx.var[var.arg!.ToString()!] = var.x!;
+                        subCtx[var.arg!.ToString()!] = var.x!;
                     return res.func.Evaluate(subCtx);
                 case Type.Parentheses:
                     return new UnitResult(unitX?.ToUnit(ctx!), x!.Value).Normalize();
@@ -365,12 +371,13 @@ namespace clmath
 
         public override string ToString()
         {
-            var str = string.Empty;
             switch (type)
             {
                 case Type.Num:
                 case Type.Var:
                     return arg! + (unitX?.ToString() ?? string.Empty);
+                case Type.Mem:
+                    return "mem" + (x == null ? string.Empty : $"[{x}]");
                 case Type.FuncX:
                     return $"{func.ToString()!.ToLower()}({x}){unitX?.ToString() ?? string.Empty}";
                 case Type.Factorial:
