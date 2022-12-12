@@ -260,7 +260,6 @@ namespace clmath
                             Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
                             Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
                             Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
-                            Console.WriteLine("\tmemmode <fifo/lifo>\t\tSets the memory mode to FIFO/LIFO");
                             Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
                             Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
                             Console.WriteLine("\nEnter a function to start evaluating");
@@ -876,6 +875,10 @@ namespace clmath
                 return;
             switch (cmds[1])
             {
+                case "vars":
+                    ctx.ClearVars();
+                    Console.WriteLine("Variables cleared");
+                    break;
                 case "stash":
                     stash.Clear();
                     Console.WriteLine("Stash cleared");
@@ -885,7 +888,7 @@ namespace clmath
                     Console.WriteLine("Memory cleared");
                     break;
                 default:
-                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'stash' and 'mem'");
+                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'vars', 'stash' and 'mem'");
                     break;
             }
         }
