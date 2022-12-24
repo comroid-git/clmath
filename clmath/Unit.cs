@@ -54,10 +54,12 @@ namespace clmath
             return Id;
         }
 
-        public static UnitResult Normalize(Unit unit, double value)
+        public static UnitResult Normalize(Unit unit, double value, SiPrefix? preferredPrefix = null)
         {
             if (unit.Id == string.Empty)
                 return new UnitResult(SiUnit.None, value);
+            if (preferredPrefix != null)
+                return new UnitResult(new SiUnit(preferredPrefix, unit), preferredPrefix.Convert(None, value));
             for (var i = 0; i < values.Count; i++)
             {
                 var si = values[i];
@@ -103,15 +105,15 @@ namespace clmath
             return SiPrefix.Normalize(outputUnit, lhs / rhs);
         }
 
-        public UnitResult Normalize()
+        public UnitResult Normalize(SiPrefix? preferredPrefix = null)
         {
-            return SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value));
+            return SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value), preferredPrefix);
         }
 
         public override string ToString()
         {
             return Value.ToString(CultureInfo.InvariantCulture) +
-                   (Unit.ToString() == string.Empty ? string.Empty : $"[{Unit}]");
+                   (Unit.ToString() == string.Empty ? string.Empty : $"_{Unit}");
         }
     }
 
