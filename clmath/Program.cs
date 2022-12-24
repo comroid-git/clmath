@@ -1007,11 +1007,12 @@ namespace clmath
         private readonly MathContext? _parent;
         private readonly Dictionary<string, Component> var = new();
         private readonly Stack<UnitResult> mem = new();
-        public readonly List<string> EnabledUnitPacks = new();
+        public readonly HashSet<string> EnabledUnitPacks = new();
 
         public MathContext(MathContext? parent)
         {
-            _parent = parent;
+            foreach (var enabled in (_parent = parent)?.EnabledUnitPacks ?? ArraySegment<string>.Empty.AsEnumerable())
+                EnabledUnitPacks.Add(enabled);
         }
 
         public Component? this[string key]
