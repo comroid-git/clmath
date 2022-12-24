@@ -47,13 +47,14 @@ ACC_R: '}';
 
 DOT: '.' | ',';
 SEMICOLON: ';';
+DASH: '_';
 DOLLAR: '$';
 EQUALS: '=';
 ABS: '|';
 DIGIT: [0-9];
 num: OP_SUB? DIGIT+ (DOT DIGIT+)?;
-CHAR: [a-zA-Z_];
-word: CHAR+;
+CHAR: [a-zA-Z_µ];
+word: CHAR (CHAR | DIGIT)*;
 evalVar: name=word EQUALS expr;
 eval: DOLLAR name=word (ACC_L evalVar (SEMICOLON evalVar)* ACC_R)?;
 
@@ -78,21 +79,21 @@ root: ROOT i=idxExpr? PAR_L x=expr PAR_R;
 abs: ABS x=expr ABS;
 
 // expressions
-unit: IDX_L u=word IDX_R;
 expr
-    : x=expr lu=unit? POW y=expr            #exprPow
-    | l=expr lu=unit? op_1 r=expr ru=unit?  #exprOp1
-    | PAR_L n=expr PAR_R u=unit?            #exprPar
-    | frac u=unit?                          #exprFrac
-    | fx u=unit?                            #exprFunc
-    | x=expr FACTORIAL u=unit?              #exprFact
-    | root u=unit?                          #exprRoot
-    | abs u=unit?                           #exprAbs
-    | num u=unit?                           #exprNum
-    | MEM (IDX_L n=expr IDX_R)?             #exprMem
-    | word                                  #exprId
-    | eval                                  #exprEval
-    | l=expr lu=unit? op_2 r=expr ru=unit?  #exprOp2
+    : expr DASH unit=word? h=DASH?  #exprUnit
+    | x=expr POW y=expr             #exprPow
+    | l=expr op_1 r=expr            #exprOp1
+    | PAR_L n=expr PAR_R            #exprPar
+    | frac                          #exprFrac
+    | fx                            #exprFunc
+    | x=expr FACTORIAL              #exprFact
+    | root                          #exprRoot
+    | abs                           #exprAbs
+    | num                           #exprNum
+    | MEM (IDX_L n=expr IDX_R)?     #exprMem
+    | word                          #exprId
+    | eval                          #exprEval
+    | l=expr op_2 r=expr            #exprOp2
 ;
 
 UNMATCHED: . ; // raise errors on unmatched

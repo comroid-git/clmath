@@ -6,11 +6,15 @@ namespace clmath
 {
     public class MathCompiler : MathBaseVisitor<Component>
     {
-        public override Component VisitUnit(MathParser.UnitContext? context)
+        public override Component VisitExprUnit(MathParser.ExprUnitContext context)
         {
-            return context?.u == null
-                ? null!
-                : new Component { type = Component.Type.Unit, arg = context?.u?.GetText() };
+            return new Component
+            {
+                type = Component.Type.Unit,
+                arg = context.unit?.GetText(),
+                x = Visit(context.expr()),
+                op = context.h != null || context.unit == null ? Component.Operator.Modulus : null
+            };
         }
 
         public override Component VisitExprNum(MathParser.ExprNumContext context)
@@ -18,8 +22,7 @@ namespace clmath
             return new Component
             {
                 type = Component.Type.Num,
-                arg = double.Parse(context.num().GetText()),
-                unitX = VisitUnit(context.u)
+                arg = double.Parse(context.num().GetText())
             };
         }
 
@@ -39,8 +42,7 @@ namespace clmath
             {
                 type = Component.Type.Frac,
                 x = Visit(context.frac().x),
-                y = Visit(context.frac().y),
-                unitX = VisitUnit(context.u)
+                y = Visit(context.frac().y)
             };
         }
 
@@ -64,8 +66,7 @@ namespace clmath
                     MathLexer.ARCTAN => Component.FuncX.ArcTan,
                     _ => throw new NotSupportedException(context.fx().func().GetText())
                 },
-                x = Visit(context.fx().x),
-                unitX = VisitUnit(context.u)
+                x = Visit(context.fx().x)
             };
         }
 
@@ -74,8 +75,7 @@ namespace clmath
             return new Component
             {
                 type = Component.Type.Factorial,
-                x = Visit(context.x),
-                unitX = VisitUnit(context.u)
+                x = Visit(context.x)
             };
         }
 
@@ -85,8 +85,7 @@ namespace clmath
             {
                 type = Component.Type.Root,
                 x = Visit(context.root().x),
-                y = Visit(context.root().i),
-                unitX = VisitUnit(context.u)
+                y = Visit(context.root().i)
             };
         }
 
@@ -95,8 +94,7 @@ namespace clmath
             return new Component
             {
                 type = Component.Type.Abs,
-                x = Visit(context.abs().x),
-                unitX = VisitUnit(context.u)
+                x = Visit(context.abs().x)
             };
         }
 
@@ -107,8 +105,7 @@ namespace clmath
                 type = Component.Type.Op,
                 op = Component.Operator.Power,
                 x = Visit(context.x),
-                y = Visit(context.y),
-                unitX = VisitUnit(context.lu)
+                y = Visit(context.y)
             };
         }
 
@@ -125,9 +122,7 @@ namespace clmath
                     _ => throw new NotSupportedException(context.op_1().GetText())
                 },
                 x = Visit(context.l),
-                y = Visit(context.r),
-                unitX = VisitUnit(context.lu),
-                unitY = VisitUnit(context.ru)
+                y = Visit(context.r)
             };
         }
 
@@ -143,9 +138,7 @@ namespace clmath
                     _ => throw new NotSupportedException(context.op_2().GetText())
                 },
                 x = Visit(context.l),
-                y = Visit(context.r),
-                unitX = VisitUnit(context.lu),
-                unitY = VisitUnit(context.ru)
+                y = Visit(context.r)
             };
         }
 
@@ -164,8 +157,7 @@ namespace clmath
             return new Component
             {
                 type = Component.Type.Parentheses,
-                x = Visit(context.n),
-                unitX = VisitUnit(context.u)
+                x = Visit(context.n)
             };
         }
 
@@ -239,8 +231,6 @@ namespace clmath
         public Operator? op { get; set; }
         public Component? x { get; set; }
         public Component? y { get; set; }
-        public Component? unitX { get; set; }
-        public Component? unitY { get; set; }
         public object? arg { get; set; }
         public Component[] args { get; set; }
 
@@ -268,7 +258,7 @@ namespace clmath
             switch (type)
             {
                 case Type.Num:
-                    return new UnitResult(unitX?.ToUnit(ctx!), (double)arg!).Normalize();
+                    return new UnitResult((double) arg!);
                 case Type.Var:
                     if (arg is not string name)
                         throw new Exception("Invalid arg: " + arg);
@@ -280,7 +270,7 @@ namespace clmath
                         else throw new Exception("Invalid random: " + arg);
                     if (Program.constants.TryGetValue(name, out var val))
                         return new UnitResult(val).Normalize();
-                    return ctx![name].Evaluate(ctx);
+                    return ctx![name]!.Evaluate(ctx);
                 case Type.Mem:
                     return ctx![(int?)x?.Value ?? 0];
                 case Type.FuncX:
@@ -316,41 +306,41 @@ namespace clmath
                         default: throw new Exception("invalid state");
                     }
 
-                    return new UnitResult(unitX?.ToUnit(ctx!), result).Normalize();
+                    return new UnitResult(SiUnit.None, result);
                 case Type.Factorial:
                     var yield = 1;
                     for (var rem = (int)x!.Value; rem > 0; rem--)
                         yield *= rem;
-                    return new UnitResult(unitX?.ToUnit(ctx!), yield).Normalize();
+                    return new UnitResult(x.Unit, yield).Normalize();
                 case Type.Root:
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
+                    return new UnitResult(SiUnit.None, Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
                 case Type.Abs:
-                    return new UnitResult(unitX?.ToUnit(ctx!), Math.Abs(x!.Value)).Normalize();
+                    return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
                 case Type.Frac:
                     return x! / y!;
                 case Type.Op:
                     switch (op)
                     {
                         case Operator.Add:
-                            return new UnitResult(unitX?.ToUnit(ctx!), x!.Value + y!.Value).Normalize();
+                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) + y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Subtract:
-                            return new UnitResult(unitX?.ToUnit(ctx!), x!.Value - y!.Value).Normalize();
+                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) - y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
-                            return x! * y!;
+                            return (x! * y!).Normalize();
                         case Operator.Divide:
-                            return x! / y!;
+                            return (x! / y!).Normalize();
                         case Operator.Modulus:
-                            return new UnitResult(unitX?.ToUnit(ctx!), x!.Value % y!.Value).Normalize();
+                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) % y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
-                            return new UnitResult(unitX?.ToUnit(ctx!), Math.Pow(x!.Value, y!.Value)).Normalize();
+                            return new UnitResult(x!.Unit, Math.Pow(x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value), y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value))).Normalize();
                         case null: throw new Exception("invalid state");
                     }
 
                     break;
                 case Type.Eval:
                     if (Program.LoadFunc(arg!.ToString()!) is not { } res)
-                        return new UnitResult(unitX?.ToUnit(ctx!), double.NaN).Normalize();
+                        return new UnitResult(SiUnit.None, double.NaN).Normalize();
                     var subCtx = new MathContext(res.ctx);
                     foreach (var (key, value) in ctx!.Vars())
                         subCtx[key] = value;
@@ -358,7 +348,12 @@ namespace clmath
                         subCtx[var.arg!.ToString()!] = var.x!;
                     return res.func.Evaluate(subCtx);
                 case Type.Parentheses:
-                    return new UnitResult(unitX?.ToUnit(ctx!), x!.Value).Normalize();
+                    return new UnitResult(x!.Unit, x.Value).Normalize();
+                case Type.Unit:
+                    var unitResult = new UnitResult(arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()), x!.Value);
+                    if (op == Operator.Modulus)
+                        return unitResult.Normalize(SiPrefix.None);
+                    else return unitResult.Normalize();
             }
 
             throw new NotSupportedException(ToString());
@@ -375,20 +370,20 @@ namespace clmath
             {
                 case Type.Num:
                 case Type.Var:
-                    return arg! + (unitX?.ToString() ?? string.Empty);
+                    return arg?.ToString()!;
                 case Type.Mem:
                     return "mem" + (x == null ? string.Empty : $"[{x}]");
                 case Type.FuncX:
-                    return $"{func.ToString()!.ToLower()}({x}){unitX?.ToString() ?? string.Empty}";
+                    return $"{func.ToString()!.ToLower()}({x})";
                 case Type.Factorial:
-                    return $"{x}!{unitX?.ToString() ?? string.Empty}";
+                    return $"{x}!";
                 case Type.Root:
                     var n = y?.ToString() ?? "2";
-                    return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x}){unitX?.ToString() ?? string.Empty}";
+                    return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x})";
                 case Type.Abs:
-                    return $"|{x}|{unitX?.ToString() ?? string.Empty}";
+                    return $"|{x}|";
                 case Type.Frac:
-                    return $"frac({x})({y}){unitX?.ToString() ?? string.Empty}";
+                    return $"frac({x})({y})";
                 case Type.Op:
                     var op = this.op switch
                     {
@@ -406,9 +401,9 @@ namespace clmath
                         ? string.Empty
                         : $"{{{string.Join("; ", args.Select(var => $"{var.arg}={var.x}"))}}}");
                 case Type.Parentheses:
-                    return $"({x}){unitX?.ToString() ?? string.Empty}";
+                    return $"({x})";
                 case Type.Unit:
-                    return (string)arg! == string.Empty ? string.Empty : $"[{arg}]";
+                    return $"{x}_{arg ?? string.Empty}";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type));
             }

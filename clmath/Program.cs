@@ -524,6 +524,7 @@ namespace clmath
         {
             if (IsInvalidArgumentCount(cmds, 2))
                 return;
+            /*
             if (cmds[1] == "unit")
             {
                 // save as unit
@@ -567,7 +568,7 @@ namespace clmath
                 var path = Path.Combine(dir, cmds[1] + FuncExt);
                 File.WriteAllText(path, data);
                 Console.WriteLine($"Function saved as {cmds[1]}");
-            }
+            }*/
         }
 
         private static void CmdClearVar(string[] cmds, MathContext ctx)
