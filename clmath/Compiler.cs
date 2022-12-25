@@ -403,7 +403,7 @@ namespace clmath
                 case Type.Parentheses:
                     return $"({x})";
                 case Type.Unit:
-                    return $"{x}_{arg ?? string.Empty}";
+                    return $"{x}:{arg ?? string.Empty}{(arg != null && this.op == Operator.Modulus ? ":" : string.Empty)}";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type));
             }
