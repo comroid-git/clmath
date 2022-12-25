@@ -95,5 +95,7 @@ expr
     | eval                              #exprEval
     | l=expr op_2 r=expr                #exprOp2
 ;
+equation: lhs=expr EQUALS rhs=expr;
+unitFile: equation*;
 
 UNMATCHED: . ; // raise errors on unmatched

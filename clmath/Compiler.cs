@@ -6,6 +6,21 @@ namespace clmath
 {
     public class MathCompiler : MathBaseVisitor<Component>
     {
+        public new IEnumerable<Component> VisitUnitFile(MathParser.UnitFileContext unit)
+        {
+            return unit.equation().Select(Visit);
+        }
+
+        public override Component VisitEquation(MathParser.EquationContext context)
+        {
+            return new Component
+            {
+                type = Component.Type.Equation,
+                x = Visit(context.lhs),
+                y = Visit(context.rhs)
+            };
+        }
+
         public override Component VisitExprUnit(MathParser.ExprUnitContext context)
         {
             return new Component
@@ -223,7 +238,8 @@ namespace clmath
             Op,
             Mem,
             Parentheses,
-            Unit
+            Unit,
+            Equation
         }
 
         public Type type { get; set; }
@@ -404,6 +420,8 @@ namespace clmath
                     return $"({x})";
                 case Type.Unit:
                     return $"{x}:{arg ?? string.Empty}{(arg != null && this.op == Operator.Modulus ? ":" : string.Empty)}";
+                case Type.Equation:
+                    return $"{x} = {y}";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type));
             }
