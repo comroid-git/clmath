@@ -63,7 +63,7 @@ namespace clmath
             }
 
             LoadConstants();
-            LoadUnits();
+            LoadUnits(BaseContext);
         }
 
         public static Dictionary<string, double> constants { get; private set; } = null!;
@@ -94,7 +94,7 @@ namespace clmath
                 constants[key] = value.Evaluate(null).Value; // todo: use UnitResult in constants?
         }
 
-        private static void LoadUnits()
+        private static void LoadUnits(MathContext ctx)
         {
             foreach (var pkg in Directory.EnumerateDirectories(dir, $"*{UnitPackExt}"))
             {
@@ -102,6 +102,7 @@ namespace clmath
                 var package = new UnitPackage(packageName);
                 foreach (var unitFile in Directory.EnumerateFiles(pkg, $"*{UnitExt}"))
                     package.Load(unitFile);
+                package.Finalize(ctx);
                 unitPackages[packageName] = package;
             }
         }
@@ -760,7 +761,7 @@ namespace clmath
                     Console.WriteLine($"Units in package '{package.Name}':");
                     foreach (var unit in package.values.Values)
                     {
-                        Console.WriteLine($"\t{unit.DisplayName}");
+                        Console.WriteLine($"\t{unit.Name}");
                         foreach (var (factor, result) in unit.Products)
                             Console.WriteLine($"\t\t{unit} = {result} / {factor}");
                         foreach (var (dividend, result) in unit.Quotients)
