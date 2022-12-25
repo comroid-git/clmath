@@ -54,7 +54,7 @@ namespace clmath
             return Id;
         }
 
-        public static UnitResult Normalize(Unit unit, double value, SiPrefix? preferredPrefix = null)
+        public static UnitResult Normalize(AbstractUnit unit, double value, SiPrefix? preferredPrefix = null)
         {
             if (preferredPrefix != null)
                 return new UnitResult(new SiUnit(preferredPrefix, unit), preferredPrefix.Convert(None, value));
@@ -111,23 +111,23 @@ namespace clmath
         public override string ToString()
         {
             return Value.ToString(CultureInfo.InvariantCulture) +
-                   (Unit.ToString() == string.Empty ? string.Empty : $"_{Unit}");
+                   (Unit.ToString() == string.Empty ? string.Empty : $":{Unit}");
         }
     }
 
     public abstract class AbstractUnit
     {
-        protected abstract Unit AsUnit();
+        protected internal abstract Unit AsUnit(MathContext? ctx = null);
 
-        public Unit Multiply(AbstractUnit other) => FindCommonUnit(other) ?? AsUnit().Products[other.AsUnit()];
+        public AbstractUnit Multiply(AbstractUnit other, MathContext? ctx = null) => FindCommonUnit(other) ?? AsUnit(ctx).Products[other.AsUnit(ctx)];
 
-        public Unit Divide(AbstractUnit other) => FindCommonUnit(other) ?? AsUnit().Quotients[other.AsUnit()];
+        public AbstractUnit Divide(AbstractUnit other, MathContext? ctx = null) => FindCommonUnit(other) ?? AsUnit(ctx).Quotients[other.AsUnit(ctx)];
 
-        private Unit? FindCommonUnit(AbstractUnit other)
+        private AbstractUnit? FindCommonUnit(AbstractUnit other, MathContext? ctx = null)
         {
-            var it = AsUnit();
-            var ot = other.AsUnit();
-            return (it.Id == string.Empty, ot.Id == string.Empty) switch
+            var it = AsUnit(ctx);
+            var ot = other.AsUnit(ctx);
+            return (it.Repr == string.Empty, ot.Repr == string.Empty) switch
             {
                 (true, true) => Unit.None,
                 (false, true) => it,
@@ -139,13 +139,13 @@ namespace clmath
 
     public sealed class SiUnit : AbstractUnit
     {
-        public static readonly SiUnit None = new(SiPrefix.None, Unit.None);
+        public static readonly SiUnit None = new(SiPrefix.None, clmath.Unit.None);
         public readonly SiPrefix Prefix;
-        public readonly Unit Unit;
+        public readonly AbstractUnit Unit;
 
         public SiUnit(string str, params UnitPackage[] packages)
         {
-            var unit = packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str);
+            var unit = packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Repr == str);
             SiPrefix? si = null;
             if (unit == null)
             {
@@ -159,11 +159,11 @@ namespace clmath
 
             Prefix = si ?? SiPrefix.None;
             Unit = unit
-                   ?? packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Id == str)
-                   ?? Unit.None;
+                   ?? packages.SelectMany(pkg => pkg.values.Values).FirstOrDefault(unit => unit.Repr == str)
+                   ?? clmath.Unit.None;
         }
 
-        internal SiUnit(SiPrefix prefix, Unit unit)
+        internal SiUnit(SiPrefix prefix, AbstractUnit unit)
         {
             Prefix = prefix;
             Unit = unit;
@@ -174,35 +174,33 @@ namespace clmath
             return $"{Prefix}{Unit}";
         }
 
-        protected override Unit AsUnit()
-        {
-            return Unit;
-        }
+        protected internal override Unit AsUnit(MathContext? ctx = null) => Unit.AsUnit(ctx);
     }
 
     public sealed class Unit : AbstractUnit
     {
         public static readonly Unit None = new(UnitPackage.None, string.Empty);
-        public readonly ConcurrentDictionary<Unit, Unit> Products = new();
-        public readonly ConcurrentDictionary<Unit, Unit> Quotients = new();
+        public readonly ConcurrentDictionary<Unit, AbstractUnit> Products = new();
+        public readonly ConcurrentDictionary<Unit, AbstractUnit> Quotients = new();
 
-        internal Unit(UnitPackage package, string id)
+        internal Unit(UnitPackage package, string name)
         {
-            package.values[Id = id] = this;
+            Name = name;
         }
 
-        public string Id { get; }
-        public string DisplayName { get; internal set; }
+        public string Name { get; }
+        public string Repr { get; private set; } = null!;
+
+        internal void SetRepr(string repr) => Repr ??= repr;
 
         public override string ToString()
         {
-            return Id;
+            return Repr;
         }
 
-        protected override Unit AsUnit()
-        {
-            return this;
-        }
+        public Unit Resolve(MathContext ctx) => this;
+
+        protected internal override Unit AsUnit(MathContext? ctx = null) => this;
 
         public void AddProduct(Unit other, Unit result)
         {
@@ -221,10 +219,30 @@ namespace clmath
         }
     }
 
+    public sealed class UnitRef : AbstractUnit
+    {
+        private readonly string _repr;
+
+        public UnitRef(string repr) => _repr = repr;
+
+        protected internal override Unit AsUnit(MathContext? ctx = null)
+        {
+            return (ctx ?? throw new ArgumentNullException(nameof(ctx), "Context may not be null for UnitRef"))
+                   .GetUnitPackages()
+                   .SelectMany(pkg => pkg.values)
+                   .Where(unit => unit.Key == _repr)
+                   .Select(entry => entry.Value)
+                   .FirstOrDefault()
+                   ?? throw new FileNotFoundException($"Unit {_repr} was not found");
+        }
+
+        public override string ToString() => _repr;
+    }
+
     public sealed class UnitPackage
     {
         public static readonly UnitPackage None = new(string.Empty);
-        private static readonly string DescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
+        private static readonly string DescriptorPattern = "[\\w\\d]+(\\/|\\*)(\\w+)=(\\w+)";
         public readonly ConcurrentDictionary<string, Unit> values = new();
 
         public UnitPackage(string name)
@@ -234,10 +252,30 @@ namespace clmath
 
         public string Name { get; }
 
-        public Unit Get(string id)
+        public AbstractUnit Get(string id)
         {
-            return values.GetOrAdd(id, id => new Unit(this, id));
+            return (AbstractUnit?) values!.GetValueOrDefault(id, null) ?? new UnitRef(id);
         }
+
+        public Unit CreateOrGet(string name, string? id)
+        {
+            Unit Factory(string? _ = null) => new(this, name);
+            return id == null ? Factory() : values.GetOrAdd(id, Factory);
+        }
+
+        private struct UnitCandidate
+        {
+            internal Unit unit;
+            internal readonly Dictionary<AbstractUnit, AbstractUnit> productCandidates = new();
+            internal readonly Dictionary<AbstractUnit, AbstractUnit> quotientCandidates = new();
+
+            public UnitCandidate(Unit unit)
+            {
+                this.unit = unit;
+            }
+        }
+
+        private List<UnitCandidate> _candidates = new();
 
         public void Load(string file)
         {
@@ -245,13 +283,15 @@ namespace clmath
                 throw new Exception($"Unit descriptor file {file} does not exist");
             var fName = new FileInfo(file).Name;
             var uName = fName.Substring(0, fName.IndexOf(Program.UnitExt, StringComparison.Ordinal));
-            var unit = Get(uName);
+            var unit = CreateOrGet(uName, null);
+            var candidate = new UnitCandidate(unit);
+            _candidates.Add(candidate);
             var i = 0;
             foreach (var line in File.ReadLines(file))
             {
                 if (i++ == 0)
                 {
-                    unit.DisplayName = line;
+                    unit.SetRepr(line);
                     continue;
                 }
 
@@ -261,15 +301,32 @@ namespace clmath
                 var result = Get(match.Groups[3].Value);
                 switch (match.Groups[1].Value)
                 {
-                    case "p":
-                        unit.AddProduct(other, result);
+                    case "*":
+                        candidate.productCandidates[other] = result;
                         break;
-                    case "q":
-                        unit.AddQuotient(other, result);
+                    case "/":
+                        candidate.quotientCandidates[other] = result;
                         break;
                     default: throw new Exception("Invalid descriptor: " + line);
                 }
             }
+        }
+
+        public void Finalize(MathContext ctx)
+        {
+            if (_candidates == null)
+                throw new Exception("Already finalized");
+            foreach (var candidate in _candidates)
+            {
+                foreach (var (multiplier, product) in candidate.productCandidates)
+                    candidate.unit.AddProduct(multiplier.AsUnit(ctx), product.AsUnit(ctx));
+                foreach (var (dividend, quotient) in candidate.quotientCandidates)
+                    candidate.unit.AddProduct(dividend.AsUnit(ctx), quotient.AsUnit(ctx));
+                candidate.quotientCandidates.Clear();
+                candidate.productCandidates.Clear();
+            }
+            _candidates.Clear();
+            _candidates = null!;
         }
 
         public override string ToString()
