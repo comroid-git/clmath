@@ -234,20 +234,20 @@ namespace clmath
         public object? arg { get; set; }
         public Component[] args { get; set; }
 
-        public List<string> EnumerateVars()
+        public List<string> GetVars()
         {
             if (type == Type.Var)
                 return new List<string> { (arg as string)! };
             List<string> vars = new();
             if (type == Type.Eval)
             {
-                Program.LoadFunc(arg!.ToString()!)?.func.EnumerateVars().ForEach(vars.Add);
+                Program.LoadFunc(arg!.ToString()!)?.func.GetVars().ForEach(vars.Add);
                 foreach (var arg in args)
                     vars.Add(arg.arg!.ToString()!);
             }
 
-            x?.EnumerateVars().ForEach(vars.Add);
-            y?.EnumerateVars().ForEach(vars.Add);
+            x?.GetVars().ForEach(vars.Add);
+            y?.GetVars().ForEach(vars.Add);
             return vars.Distinct().ToList();
         }
 

@@ -33,7 +33,7 @@ namespace clmath
                 var xCopy = rhs.x?.Copy();
                 var yCopy = rhs.y?.Copy();
                 // must reverse by commutativity?
-                var reverse = yCopy?.EnumerateVars().Contains(target) ?? false;
+                var reverse = yCopy?.GetVars().Contains(target) ?? false;
                 switch (rhs.type)
                 {
                     case Component.Type.Op:

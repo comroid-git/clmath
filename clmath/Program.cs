@@ -379,7 +379,7 @@ namespace clmath
 
         private static void EvalFunc(Component func, MathContext ctx, string? f = null)
         {
-            if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
+            if (func.GetVars().Distinct().All(constants.ContainsKey))
             {
                 var res = func.Evaluate(new MathContext(BaseContext));
                 PrintResult(func, res, BaseContext, false);
@@ -402,7 +402,7 @@ namespace clmath
                         {
                             var key = result.key;
                             var value = result.value;
-                            if (value.EnumerateVars().Contains(key))
+                            if (value.GetVars().Contains(key))
                                 Console.WriteLine($"Error: Variable {key} cannot use itself");
                             else if (constants.ContainsKey(key))
                                 Console.WriteLine($"Error: Cannot redefine {key}");
@@ -504,7 +504,7 @@ namespace clmath
                 return;
             lhs ??= new Component { type = Component.Type.Var, arg = cmds[2] };
             var target = cmds[1];
-            var count = func.EnumerateVars().Count(x => x == target);
+            var count = func.GetVars().Count(x => x == target);
             if (count == 0)
             {
                 Console.WriteLine($"Error: Variable {target} was not found in function");
@@ -923,7 +923,7 @@ namespace clmath
             foreach (var var in ctx.Vars()
                          .Select(x => x.Value)
                          .Append(func)
-                         .SelectMany(it => it.EnumerateVars())
+                         .SelectMany(it => it.GetVars())
                          .Distinct())
                 if (ctx.Vars().All(x => x.Key != var))
                     missing.Add(var);

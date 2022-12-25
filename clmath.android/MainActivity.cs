@@ -38,7 +38,7 @@ namespace clmath.android
         {
             var func = Program.ParseFunc(FuncInput.Text!);
 
-            var vars = func.EnumerateVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
+            var vars = func.GetVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
             if (vars.Any(var => !Ctx.var.ContainsKey(var)))
             {
                 Snackbar.Make(FuncInput, "Please set all variables and try again", 3000).Show();
