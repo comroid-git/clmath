@@ -56,8 +56,6 @@ namespace clmath
 
         public static UnitResult Normalize(Unit unit, double value, SiPrefix? preferredPrefix = null)
         {
-            if (unit.Id == string.Empty)
-                return new UnitResult(SiUnit.None, value);
             if (preferredPrefix != null)
                 return new UnitResult(new SiUnit(preferredPrefix, unit), preferredPrefix.Convert(None, value));
             for (var i = 0; i < values.Count; i++)
