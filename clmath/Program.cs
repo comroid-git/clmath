@@ -499,7 +499,7 @@ namespace clmath
                                         "\nSet variables with an equation (example: 'x = 5' or 'y = x * 2')");
                                     break;
                                 case "dump":
-                                    DumpVariables(ctx, func.ToString().Length / 8 + 1);
+                                    DumpVariables(ctx);
                                     break;
                                 case "list":
                                     CmdList(ctx, cmds);
@@ -645,7 +645,7 @@ namespace clmath
             var missing = FindMissingVariables(func, ctx);
             if (missing.Count > 0)
             {
-                DumpVariables(ctx, func.ToString().Length / 8 + 1);
+                DumpVariables(ctx);
                 Console.WriteLine(
                     $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
             }
@@ -760,7 +760,7 @@ namespace clmath
                     foreach (var (fx, ctx0) in stash)
                     {
                         Console.WriteLine($"\tstash[{i0++}]\t= {fx}");
-                        ctx0.DumpVariables("stash[#]".Length / 8 + 1, false);
+                        ctx0.DumpVariables(shouldError: false);
                     }
 
                     break;
@@ -1062,34 +1062,48 @@ namespace clmath
             _graph = new Graph(funcs);
         }
 
-        private static int DumpVariables(this MathContext ctx, int alignBase = 1, bool shouldError = true)
+        private static void DumpVariables(this MathContext ctx, TextTable? table = null, bool shouldError = true)
         {
+            TextTable.Column term, expr;
+            bool newTable = table == null;
+            if (table == null)
+            {
+                table = new TextTable(true, true);
+                term = table.AddColumn("Variable");
+                expr = table.AddColumn("Value", true);
+            }
+            else
+            {
+                term = table.Columns[0];
+                expr = table.Columns[1];
+            }
             if (!ctx.Vars().Any())
             {
                 if (shouldError)
                     Console.WriteLine("Error: No variables are set");
-                return 1;
+                return;
             }
-
-            var maxAlign = ctx.Vars().Select(x => x.Key).Max(key => key.Length) / 8;
             foreach (var (key, val) in ctx.Vars())
             {
-                var align = Math.Max(maxAlign > 0 ? maxAlign - alignBase : alignBase,
-                    maxAlign - (key.Length / 8 + 1) + alignBase);
-                var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-                Console.WriteLine($"\t{key}{spacer}= {val}");
+                table.AddRow()
+                    .SetData(term, key)
+                    .SetData(expr, val);
             }
-
-            return maxAlign;
+            if (newTable) 
+                Console.WriteLine(table);
         }
 
         private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
         {
-            ctx[0] = result;
-            var funcAlign = func.ToString().Length / 8 + 1;
-            var align = Math.Max(1, (ctx?.DumpVariables(funcAlign, shouldError) ?? 1) - funcAlign);
-            var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-            Console.WriteLine($"\t{func}{spacer}= {result}");
+            ctx[0] = result; // push result to mem
+            var table = new TextTable(true, true);
+            var term = table.AddColumn("Term");
+            var expr = table.AddColumn("Value", true);
+            ctx.DumpVariables(table, shouldError);
+            table.AddRow()
+                .SetData(term, func)
+                .SetData(expr, result);
+            Console.WriteLine(table);
         }
 
         internal static double IntoDRG(double value)
