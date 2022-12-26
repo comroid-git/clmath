@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "clmath.test", "clmath.test\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "clmath.android", "clmath.android\clmath.android.csproj", "{FC929F28-01DA-46FE-B263-A7323F19C95C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "winbash-util", "..\winbash\winbash-util\winbash-util.csproj", "{E5C57FC4-1655-4888-AFE0-590B9BA8190D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{FC929F28-01DA-46FE-B263-A7323F19C95C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FC929F28-01DA-46FE-B263-A7323F19C95C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FC929F28-01DA-46FE-B263-A7323F19C95C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5C57FC4-1655-4888-AFE0-590B9BA8190D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5C57FC4-1655-4888-AFE0-590B9BA8190D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5C57FC4-1655-4888-AFE0-590B9BA8190D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5C57FC4-1655-4888-AFE0-590B9BA8190D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

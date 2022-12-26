@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
+using winbash.util;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -291,6 +292,7 @@ namespace clmath
                             Console.WriteLine("\tset <const>\t\t\tDefines a constant");
                             Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
                             Console.WriteLine("\tlist <target>\t\t\tLists things");
+                            Console.WriteLine("\tunit <verb> [args]\t\tModify Units");
                             Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
                             Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
                             Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
@@ -311,6 +313,9 @@ namespace clmath
                             break;
                         case "list":
                             CmdList(BaseContext, cmds);
+                            break;
+                        case "unit":
+                            CmdUnit(BaseContext, cmds);
                             break;
                         case "enable" or "disable":
                             CmdToggleState(cmds, cmds[0] == "enable");
@@ -816,6 +821,80 @@ namespace clmath
             }
         }
 
+        private static UnitPackage selectedPkg;
+        private static Unit selectedUnit;
+        private static void CmdUnit(MathContext ctx, string[] cmds)
+        {
+            if (IsInvalidArgumentCount(cmds, 2))
+                return;
+
+            void Selection(byte m, string? detail = null)
+            {
+                if (m == 0 && selectedPkg == null)
+                    throw new Exception("No unit pack selected" + (detail == null ? string.Empty : "; " + detail));
+                if (m == 1 && selectedUnit == null)
+                    throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
+            }
+
+            TextTable table = new TextTable(true, true);
+            switch (cmds[1])
+            {
+                case "list"/* */:
+                    Selection(0);
+                    var unitName = table.AddColumn("Unit");
+                    var unitRepr = table.AddColumn("ID");
+                    foreach (var unit in selectedPkg.values.Values)
+                        table.AddRow()
+                            .SetData(unitName, unit.Name)
+                            .SetData(unitRepr, unit.Repr);
+                    Console.WriteLine(table);
+                    break;
+                case "sel"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])!;
+                    Selection(1, "unknown unit: " + cmds[2]);
+                    break;
+                case "add"/* <namee> <repr> */:
+                    if (IsInvalidArgumentCount(cmds, 4))
+                        return;
+                    break;
+                case "del"/* */:
+                    break;
+                case "addequ"/* <equation> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    break;
+                case "listpkg"/* */:
+                    var pkgName = table.AddColumn("Name");
+                    var unitCount = table.AddColumn("Units");
+                    foreach (var (name, pkg) in unitPackages)
+                        table.AddRow()
+                            .SetData(pkgName, name)
+                            .SetData(unitCount, pkg.values.Count);
+                    Console.WriteLine(table);
+                    break;
+                case "selpkg"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = null!;
+                    selectedPkg = unitPackages.GetValueOrDefault(cmds[2])!;
+                    Selection(0, "unknown package: " + cmds[2]);
+                    break;
+                case "addpkg"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = null!;
+                    selectedPkg = unitPackages[cmds[2]] = new UnitPackage(cmds[2]);
+                    Selection(0, "failed to create package: " + cmds[2]);
+                    break;
+                case "delpkg"/* */:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cmds), "Invalid arguments");
+            }
+        }
+
         private static void CmdToggleState(string[] cmds, bool newState)
         {
             if (IsInvalidArgumentCount(cmds, 2))
@@ -1108,5 +1187,8 @@ namespace clmath
                 .Select(pkg => pkg.Value)
                 .ToArray();
         }
+
+        public Unit? FindUnit(string id) =>
+            GetUnitPackages().SelectMany(x => x.values.Values).FirstOrDefault(x => x.Repr == id);
     }
 }

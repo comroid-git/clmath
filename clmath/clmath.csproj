@@ -49,4 +49,8 @@
         </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\winbash\winbash-util\winbash-util.csproj" />
+    </ItemGroup>
+
 </Project>
