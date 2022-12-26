@@ -129,7 +129,7 @@ namespace clmath
         public override string ToString()
         {
             return Value.ToString(CultureInfo.InvariantCulture) +
-                   (Unit.ToString() == string.Empty ? string.Empty : $":{Unit}");
+                   (Unit.ToString() == string.Empty ? string.Empty : $"{Unit}");
         }
     }
 

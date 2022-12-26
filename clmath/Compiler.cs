@@ -422,7 +422,7 @@ namespace clmath
                 case Type.Parentheses:
                     return $"({x})";
                 case Type.Unit:
-                    return $"{x}:{arg ?? string.Empty}{(arg != null && this.op == Operator.Modulus ? ":" : string.Empty)}";
+                    return $"{x}{arg ?? string.Empty}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
                 case Type.Equation:
                     return $"{x} = {y}";
                 default:

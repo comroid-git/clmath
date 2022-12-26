@@ -47,7 +47,7 @@ ACC_R: '}';
 
 DOT: '.' | ',';
 SEMICOLON: ';';
-COLON: ':';
+QUESTION: '?';
 DOLLAR: '$';
 EQUALS: '=';
 ABS: '|';
@@ -80,20 +80,20 @@ abs: ABS x=expr ABS;
 
 // expressions
 expr
-    : expr COLON unit=word? h=COLON?    #exprUnit
-    | x=expr POW y=expr                 #exprPow
-    | l=expr op_1 r=expr                #exprOp1
-    | PAR_L n=expr PAR_R                #exprPar
-    | frac                              #exprFrac
-    | fx                                #exprFunc
-    | x=expr FACTORIAL                  #exprFact
-    | root                              #exprRoot
-    | abs                               #exprAbs
-    | num                               #exprNum
-    | MEM (IDX_L n=expr IDX_R)?         #exprMem
-    | word                              #exprId
-    | eval                              #exprEval
-    | l=expr op_2 r=expr                #exprOp2
+    : expr (unit=word|h=QUESTION|unit=word h=QUESTION)  #exprUnit
+    | x=expr POW y=expr                                 #exprPow
+    | l=expr op_1 r=expr                                #exprOp1
+    | PAR_L n=expr PAR_R                                #exprPar
+    | frac                                              #exprFrac
+    | fx                                                #exprFunc
+    | x=expr FACTORIAL                                  #exprFact
+    | root                                              #exprRoot
+    | abs                                               #exprAbs
+    | num                                               #exprNum
+    | MEM (IDX_L n=expr IDX_R)?                         #exprMem
+    | word                                              #exprId
+    | eval                                              #exprEval
+    | l=expr op_2 r=expr                                #exprOp2
 ;
 equation: lhs=expr EQUALS rhs=expr;
 unitFile: equation*;
