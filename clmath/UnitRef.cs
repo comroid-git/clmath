@@ -22,7 +22,6 @@ namespace clmath
         public static readonly SiPrefix Pico = new("p", -12);
         public static readonly SiPrefix Nano = new("n", -9);
         public static readonly SiPrefix Micro = new("\u00B5", -6);
-
         public static readonly SiPrefix Milli = new("m", -3);
         //public static readonly SiPrefix Centi = new("c", -2);
         //public static readonly SiPrefix Deci = new("d", -1);
