@@ -109,8 +109,8 @@ namespace clmath
                     {
                         package.Load(MigrateUnitFile(unitFile));
                     }
-                package.Finalize();
                 unitPackages[packageName] = package;
+                package.Finalize(ctx);
             }
         }
 
@@ -800,8 +800,7 @@ namespace clmath
                     foreach (var unit in package.values.Values)
                     {
                         Console.WriteLine($"\t{unit.Name}");
-                        foreach (var (other, evals) in unit.GetEvaluators())
-                        foreach (var eval in evals)
+                        foreach (var (other, op, eval) in unit.GetEvaluators())
                             Console.WriteLine($"{unit}{eval.op switch {
                                 Component.Operator.Multiply => "*",
                                 Component.Operator.Divide => "/",

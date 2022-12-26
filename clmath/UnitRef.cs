@@ -93,20 +93,20 @@ namespace clmath
             Value = value;
         }
 
-        public UnitResult Multiply(UnitResult right)
+        public UnitResult Multiply(MathContext ctx, UnitResult right)
         {
             var lhs = SiPrefix.None.Convert(Unit.Prefix, Value);
             var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
-            var evl = Unit.AsUnit()[right.Unit, Component.Operator.Multiply];
+            var evl = Unit.AsUnit(ctx)[right.Unit, Component.Operator.Multiply];
             var res = evl.Evaluate(lhs, rhs);
             return new UnitResult(new SiUnit(SiPrefix.None, evl.output), res);
         }
 
-        public UnitResult Divide(UnitResult right)
+        public UnitResult Divide(MathContext ctx, UnitResult right)
         {
             var lhs = SiPrefix.None.Convert(Unit.Prefix, Value);
             var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
-            var evl = Unit.AsUnit()[right.Unit, Component.Operator.Divide];
+            var evl = Unit.AsUnit(ctx)[right.Unit, Component.Operator.Divide];
             var res = evl.Evaluate(lhs, rhs);
             return new UnitResult(new SiUnit(SiPrefix.None, evl.output), res);
         }
@@ -196,14 +196,14 @@ namespace clmath
             return $"{Prefix}{Unit}";
         }
 
-        public override string Repr => ToString();
+        public override string Repr => Unit.Repr;
         protected internal override Unit AsUnit(MathContext? ctx = null) => Unit.AsUnit(ctx);
     }
 
     public sealed class Unit : AbstractUnit
     {
         public static readonly Unit None = new(UnitPackage.None, string.Empty, string.Empty);
-        private readonly ConcurrentDictionary<AbstractUnit, ConcurrentDictionary<Component.Operator, UnitEvaluator>> Evaluators = new();
+        private readonly ConcurrentDictionary<(string repr, Component.Operator op), UnitEvaluator> Evaluators = new();
 
         internal Unit(UnitPackage package, string name, string repr)
         {
@@ -213,10 +213,8 @@ namespace clmath
 
         internal UnitEvaluator this[AbstractUnit other, Component.Operator op]
         {
-            get => Evaluators.GetOrAdd(other,
-                    (_) => new ConcurrentDictionary<Component.Operator, UnitEvaluator>())[op];
-            set => Evaluators.GetOrAdd(other,
-                    (_) => new ConcurrentDictionary<Component.Operator, UnitEvaluator>())[op] = value;
+            get => Evaluators[(other.Repr, op)];
+            set => Evaluators[(other.Repr, op)] = value;
         }
 
         public string Name { get; }
@@ -241,8 +239,8 @@ namespace clmath
             result.Products[other] = this;
         }
         */
-        public IEnumerable<(AbstractUnit other, IEnumerable<UnitEvaluator> evals)> GetEvaluators() => Evaluators
-            .Select(x => (x.Key, x.Value.Select(y => y.Value)));
+        public IEnumerable<(UnitRef other, Component.Operator op, UnitEvaluator eval)> GetEvaluators() => Evaluators
+            .Select((entry) => (new UnitRef(entry.Key.repr), entry.Key.op, entry.Value));
     }
 
     public sealed class UnitRef : AbstractUnit
@@ -253,13 +251,17 @@ namespace clmath
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
         {
-            return (ctx ?? throw new ArgumentNullException(nameof(ctx), "Context may not be null for UnitRef"))
-                   .GetUnitPackages()
-                   .SelectMany(pkg => pkg.values)
-                   .Where(unit => unit.Key == Repr)
-                   .Select(entry => entry.Value)
-                   .FirstOrDefault()
-                   ?? throw new FileNotFoundException($"Unit {Repr} was not found");
+            if (string.IsNullOrEmpty(Repr))
+                return Unit.None;
+            var result = (ctx ?? throw new ArgumentNullException(nameof(ctx), "Context may not be null for UnitRef"))
+                .GetUnitPackages()
+                .SelectMany(pkg => pkg.values)
+                .Where(unit => unit.Key == Repr)
+                .Select(entry => entry.Value)
+                .FirstOrDefault();
+            if (result == null)
+                throw new FileNotFoundException($"Unit {Repr} was not found");
+            return result;
         }
 
         public override string ToString() => Repr;
@@ -300,21 +302,8 @@ namespace clmath
 
         public Unit CreateOrGet(string name, string id) => values.GetOrAdd(id, (_) => new(this, name, id));
 
-        private struct UnitCandidate
-        {
-            internal Unit unit;
-            internal readonly Dictionary<AbstractUnit, UnitEvaluator> evaluatorCandidates = new();
-
-            public UnitCandidate(Unit unit)
-            {
-                this.unit = unit;
-            }
-        }
-        
         internal class UnitLoadException : Exception {}
         
-        private List<UnitCandidate> _candidates = new();
-
         public void Load(string file)
         {
             if (!File.Exists(file))
@@ -355,7 +344,6 @@ namespace clmath
 
             if (unit == null)
                 throw new Exception("Assertion failure");
-            var candidate = new UnitCandidate(unit);
             var ais = new AntlrInputStream(fs);
             var lex = new MathLexer(ais);
             var ats = new CommonTokenStream(lex);
@@ -372,27 +360,47 @@ namespace clmath
                 var input = srcIsX ? lhs.y : lhs.x;
                 var other = input?.FindOutputUnit();
                 if (input?.type == Component.Type.Num)
-                    candidate.evaluatorCandidates[Unit.None] = 
+                    unit[Unit.None, Component.Operator.Multiply] = 
                         new UnitEvaluator(result, Component.Operator.Multiply, overrideY: (double)input.arg!);
                 else if (other != null && lhs.op is Component.Operator.Multiply or Component.Operator.Divide)
-                    candidate.evaluatorCandidates[other] = new UnitEvaluator(result, lhs.op);
+                    unit[other, lhs.op!.Value] = new UnitEvaluator(result, lhs.op);
                 else throw new Exception("Malformed equation: Only Multiply or Divide operators are allowed");
             }
-            _candidates.Add(candidate);
         }
 
-        public void Finalize()
+        public void Finalize(MathContext ctx)
         {
-            if (_candidates == null)
-                throw new Exception("Already finalized");
-            foreach (var candidate in _candidates)
+            void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) =>
+                inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
+            foreach (var inputA in values.Values)
+            foreach (var (other, op, eval) in inputA.GetEvaluators())
             {
-                foreach (var (other, eval) in candidate.evaluatorCandidates)
-                    candidate.unit[other, eval.op!.Value] = eval;
-                candidate.evaluatorCandidates.Clear();
+                var inputB = other?.AsUnit(ctx);
+                var output = eval.output.AsUnit(ctx);
+                switch (op)
+                {
+                    case Component.Operator.Multiply:
+                        if (inputB != null)
+                        {
+                            AddEval(inputB, inputA, output, Component.Operator.Multiply);
+                            AddEval(output, inputA, inputB, Component.Operator.Divide);
+                            AddEval(output, inputB, inputA, Component.Operator.Divide);
+                        }
+                        else AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
+                        break;
+                    case Component.Operator.Divide:
+                        if (inputB != null)
+                        {
+                            AddEval(inputA, output, inputB, Component.Operator.Divide);
+                            AddEval(inputB, output, inputA, Component.Operator.Multiply);
+                            AddEval(output, inputB, inputA, Component.Operator.Multiply);
+                        }
+                        else AddEval(output, Unit.None, inputA, Component.Operator.Multiply, eval.overrideY);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(eval.op));
+                }
             }
-            _candidates.Clear();
-            _candidates = null!;
         }
 
         public override string ToString()

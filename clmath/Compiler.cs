@@ -337,7 +337,7 @@ namespace clmath
                 case Type.Abs:
                     return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
                 case Type.Frac:
-                    return x!.Divide(y!);
+                    return x!.Divide(ctx!, y!);
                 case Type.Op:
                     switch (op)
                     {
@@ -346,9 +346,9 @@ namespace clmath
                         case Operator.Subtract:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) - y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
-                            return x!.Multiply(y!).Normalize();
+                            return x!.Multiply(ctx!, y!).Normalize();
                         case Operator.Divide:
-                            return x!.Divide(y!).Normalize();
+                            return x!.Divide(ctx!, y!).Normalize();
                         case Operator.Modulus:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) % y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
