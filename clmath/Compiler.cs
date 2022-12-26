@@ -388,6 +388,7 @@ namespace clmath
             switch (type)
             {
                 case Type.Num:
+                    return (arg as double?)?.ToString("0." + new string('#', 15))!;
                 case Type.Var:
                     return arg?.ToString()!;
                 case Type.Mem:

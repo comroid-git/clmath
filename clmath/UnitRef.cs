@@ -128,7 +128,7 @@ namespace clmath
 
         public override string ToString()
         {
-            return Value.ToString(CultureInfo.InvariantCulture) +
+            return Value.ToString("0." + new string('#', 15), CultureInfo.InvariantCulture) +
                    (Unit.ToString() == string.Empty ? string.Empty : $"{Unit}");
         }
     }
