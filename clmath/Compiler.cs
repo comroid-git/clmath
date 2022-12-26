@@ -332,7 +332,7 @@ namespace clmath
                     return new UnitResult(x.Unit, yield).Normalize();
                 case Type.Root:
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    return x!.Root(y);
+                    //return x!.Root(y);
                     return new UnitResult(SiUnit.None, Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
                 case Type.Abs:
                     return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
