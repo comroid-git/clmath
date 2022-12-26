@@ -101,10 +101,48 @@ namespace clmath
                 var packageName = new DirectoryInfo(pkg).Name.StripExtension(UnitPackExt);
                 var package = new UnitPackage(packageName);
                 foreach (var unitFile in Directory.EnumerateFiles(pkg, $"*{UnitExt}"))
-                    package.Load(unitFile);
-                package.Finalize(ctx);
+                    try
+                    {
+                        package.Load(unitFile);
+                    }
+                    catch (UnitPackage.UnitLoadException)
+                    {
+                        package.Load(MigrateUnitFile(unitFile));
+                    }
+                package.Finalize();
                 unitPackages[packageName] = package;
             }
+        }
+
+        private static readonly string OldDescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
+        private static string MigrateUnitFile(string unitFile)
+        {
+            Console.WriteLine("Migrating outdated unit file " + unitFile);
+            var f = new FileInfo(unitFile);
+            var repr = f.Name;
+            repr = repr.Substring(0, repr.IndexOf(UnitExt, StringComparison.Ordinal));
+            var lines = File.ReadAllLines(unitFile);
+            var convert = new List<string>();
+            var uName = lines[0];
+            for (var i = 1; i < lines.Length; i++)
+                if (Regex.Match(lines[i], OldDescriptorPattern) is { Success: true } match)
+                    convert.Add($"{repr}{(match.Groups[1].Value == "p" ? "*" : "/")}" +
+                                $"{match.Groups[2].Value}={match.Groups[3]}");
+            var newFile = Path.Combine(f.DirectoryName!, uName + UnitExt);
+            using var fs = File.OpenWrite(newFile);
+            // file head
+            fs.Write(new byte[]{0,0,0,0});
+            var buf = Encoding.ASCII.GetBytes(repr);
+            fs.Write(BitConverter.GetBytes(buf.Length));
+            fs.Write(buf);
+            fs.Write(new[] { (byte)'\n' });
+                
+            // equations
+            foreach (var equation in convert) 
+                fs.Write(Encoding.ASCII.GetBytes(equation + '\n'));
+            fs.Flush();
+            File.Delete(unitFile);
+            return newFile;
         }
 
         private static void SaveConfig()
@@ -762,10 +800,13 @@ namespace clmath
                     foreach (var unit in package.values.Values)
                     {
                         Console.WriteLine($"\t{unit.Name}");
-                        foreach (var (factor, result) in unit.Products)
-                            Console.WriteLine($"\t\t{unit} = {result} / {factor}");
-                        foreach (var (dividend, result) in unit.Quotients)
-                            Console.WriteLine($"\t\t{unit} = {result} * {dividend}");
+                        foreach (var (other, evals) in unit.GetEvaluators())
+                        foreach (var eval in evals)
+                            Console.WriteLine($"{unit}{eval.op switch {
+                                Component.Operator.Multiply => "*",
+                                Component.Operator.Divide => "/",
+                                _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString()
+                                ?? other.Repr} = {eval.output}");
                     }
 
                     break;
@@ -995,6 +1036,17 @@ namespace clmath
                 str = str.Substring(0, str.IndexOf(ext, StringComparison.Ordinal));
             return str;
         }
+
+        internal static double Evaluate(this Component.Operator op, double x, double y) => op switch
+        {
+            Component.Operator.Add => x + y,
+            Component.Operator.Subtract => x - y,
+            Component.Operator.Multiply => x * y,
+            Component.Operator.Divide => x / y,
+            Component.Operator.Modulus => x % y,
+            Component.Operator.Power => Math.Pow(x, y),
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Invalid Operator")
+        };
     }
 
     public enum CalcMode : byte

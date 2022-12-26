@@ -1,6 +1,12 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Collections;
+using System.Collections.Concurrent;
+using System.ComponentModel.Design.Serialization;
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Transactions;
+using Antlr4.Runtime;
+using clmath.Antlr;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -87,20 +93,32 @@ namespace clmath
             Value = value;
         }
 
-        public static UnitResult operator *(UnitResult left, UnitResult right)
+        public UnitResult Multiply(UnitResult right)
         {
-            var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
+            var lhs = SiPrefix.None.Convert(Unit.Prefix, Value);
             var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
-            var outputUnit = left.Unit.Multiply(right.Unit);
-            return SiPrefix.Normalize(outputUnit, lhs * rhs);
+            var evl = Unit.AsUnit()[right.Unit, Component.Operator.Multiply];
+            var res = evl.Evaluate(lhs, rhs);
+            return new UnitResult(new SiUnit(SiPrefix.None, evl.output), res);
         }
 
-        public static UnitResult operator /(UnitResult left, UnitResult right)
+        public UnitResult Divide(UnitResult right)
         {
-            var lhs = SiPrefix.None.Convert(left.Unit.Prefix, left.Value);
+            var lhs = SiPrefix.None.Convert(Unit.Prefix, Value);
             var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
-            var outputUnit = left.Unit.Divide(right.Unit);
-            return SiPrefix.Normalize(outputUnit, lhs / rhs);
+            var evl = Unit.AsUnit()[right.Unit, Component.Operator.Divide];
+            var res = evl.Evaluate(lhs, rhs);
+            return new UnitResult(new SiUnit(SiPrefix.None, evl.output), res);
+        }
+
+        public UnitResult Root(UnitResult? right)
+        {
+            right ??= new UnitResult(2);
+            var lhs = SiPrefix.None.Convert(Unit.Prefix, Value);
+            var rhs = SiPrefix.None.Convert(right.Unit.Prefix, right.Value);
+            var evl = Unit.AsUnit()[right.Unit, Component.Operator.Modulus];
+            var res = evl.Evaluate(lhs, rhs);
+            return new UnitResult(new SiUnit(SiPrefix.None, evl.output), res);
         }
 
         public UnitResult Normalize(SiPrefix? preferredPrefix = null)
@@ -117,11 +135,9 @@ namespace clmath
 
     public abstract class AbstractUnit
     {
+        public abstract string Repr { get; }
+        
         protected internal abstract Unit AsUnit(MathContext? ctx = null);
-
-        public AbstractUnit Multiply(AbstractUnit other, MathContext? ctx = null) => FindCommonUnit(other) ?? AsUnit(ctx).Products[other.AsUnit(ctx)];
-
-        public AbstractUnit Divide(AbstractUnit other, MathContext? ctx = null) => FindCommonUnit(other) ?? AsUnit(ctx).Quotients[other.AsUnit(ctx)];
 
         private AbstractUnit? FindCommonUnit(AbstractUnit other, MathContext? ctx = null)
         {
@@ -135,6 +151,12 @@ namespace clmath
                 (_, _) => null
             };
         }
+
+        public override int GetHashCode() => Repr.GetHashCode();
+
+        public override bool Equals(object? obj) => obj is AbstractUnit other && Repr == other.Repr;
+        
+        public override string ToString() => Repr;
     }
 
     public sealed class SiUnit : AbstractUnit
@@ -174,35 +196,36 @@ namespace clmath
             return $"{Prefix}{Unit}";
         }
 
+        public override string Repr => ToString();
         protected internal override Unit AsUnit(MathContext? ctx = null) => Unit.AsUnit(ctx);
     }
 
     public sealed class Unit : AbstractUnit
     {
-        public static readonly Unit None = new(UnitPackage.None, string.Empty);
-        public readonly ConcurrentDictionary<Unit, AbstractUnit> Products = new();
-        public readonly ConcurrentDictionary<Unit, AbstractUnit> Quotients = new();
+        public static readonly Unit None = new(UnitPackage.None, string.Empty, string.Empty);
+        private readonly ConcurrentDictionary<AbstractUnit, ConcurrentDictionary<Component.Operator, UnitEvaluator>> Evaluators = new();
 
-        internal Unit(UnitPackage package, string name)
+        internal Unit(UnitPackage package, string name, string repr)
         {
             Name = name;
+            Repr = repr;
+        }
+
+        internal UnitEvaluator this[AbstractUnit other, Component.Operator op]
+        {
+            get => Evaluators.GetOrAdd(other,
+                    (_) => new ConcurrentDictionary<Component.Operator, UnitEvaluator>())[op];
+            set => Evaluators.GetOrAdd(other,
+                    (_) => new ConcurrentDictionary<Component.Operator, UnitEvaluator>())[op] = value;
         }
 
         public string Name { get; }
-        public string Repr { get; private set; } = null!;
-
-        internal void SetRepr(string repr) => Repr ??= repr;
-
-        public override string ToString()
-        {
-            return Repr;
-        }
-
-        public Unit Resolve(MathContext ctx) => this;
+        public override string Repr { get; }
 
         protected internal override Unit AsUnit(MathContext? ctx = null) => this;
 
-        public void AddProduct(Unit other, Unit result)
+        /*
+        private void AddProduct(Unit other, Unit result)
         {
             Products[other] = result;
             other.Products[this] = result;
@@ -210,39 +233,57 @@ namespace clmath
             result.Quotients[other] = this;
         }
 
-        public void AddQuotient(Unit other, Unit result)
+        private void AddQuotient(Unit other, Unit result)
         {
             Quotients[other] = result;
             Quotients[result] = other;
             other.Products[result] = this;
             result.Products[other] = this;
         }
+        */
+        public IEnumerable<(AbstractUnit other, IEnumerable<UnitEvaluator> evals)> GetEvaluators() => Evaluators
+            .Select(x => (x.Key, x.Value.Select(y => y.Value)));
     }
 
     public sealed class UnitRef : AbstractUnit
     {
-        private readonly string _repr;
+        public UnitRef(string repr) => Repr = repr;
 
-        public UnitRef(string repr) => _repr = repr;
+        public override string Repr { get; }
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
         {
             return (ctx ?? throw new ArgumentNullException(nameof(ctx), "Context may not be null for UnitRef"))
                    .GetUnitPackages()
                    .SelectMany(pkg => pkg.values)
-                   .Where(unit => unit.Key == _repr)
+                   .Where(unit => unit.Key == Repr)
                    .Select(entry => entry.Value)
                    .FirstOrDefault()
-                   ?? throw new FileNotFoundException($"Unit {_repr} was not found");
+                   ?? throw new FileNotFoundException($"Unit {Repr} was not found");
         }
 
-        public override string ToString() => _repr;
+        public override string ToString() => Repr;
+    }
+
+    public sealed class UnitEvaluator
+    {
+        public readonly AbstractUnit output;
+        public readonly Component.Operator? op;
+        public readonly double? overrideY;
+
+        internal UnitEvaluator(AbstractUnit output, Component.Operator? op = null, double? overrideY = null)
+        {
+            this.output = output;
+            this.op = op;
+            this.overrideY = overrideY;
+        }
+
+        public double Evaluate(double x, double y) => op!.Value.Evaluate(x, overrideY ?? y);
     }
 
     public sealed class UnitPackage
     {
         public static readonly UnitPackage None = new(string.Empty);
-        private static readonly string DescriptorPattern = "[\\w\\d]+(\\/|\\*)(\\w+)=(\\w+)";
         public readonly ConcurrentDictionary<string, Unit> values = new();
 
         public UnitPackage(string name)
@@ -257,24 +298,21 @@ namespace clmath
             return (AbstractUnit?) values!.GetValueOrDefault(id, null) ?? new UnitRef(id);
         }
 
-        public Unit CreateOrGet(string name, string? id)
-        {
-            Unit Factory(string? _ = null) => new(this, name);
-            return id == null ? Factory() : values.GetOrAdd(id, Factory);
-        }
+        public Unit CreateOrGet(string name, string id) => values.GetOrAdd(id, (_) => new(this, name, id));
 
         private struct UnitCandidate
         {
             internal Unit unit;
-            internal readonly Dictionary<AbstractUnit, AbstractUnit> productCandidates = new();
-            internal readonly Dictionary<AbstractUnit, AbstractUnit> quotientCandidates = new();
+            internal readonly Dictionary<AbstractUnit, UnitEvaluator> evaluatorCandidates = new();
 
             public UnitCandidate(Unit unit)
             {
                 this.unit = unit;
             }
         }
-
+        
+        internal class UnitLoadException : Exception {}
+        
         private List<UnitCandidate> _candidates = new();
 
         public void Load(string file)
@@ -283,47 +321,75 @@ namespace clmath
                 throw new Exception($"Unit descriptor file {file} does not exist");
             var fName = new FileInfo(file).Name;
             var uName = fName.Substring(0, fName.IndexOf(Program.UnitExt, StringComparison.Ordinal));
-            var unit = CreateOrGet(uName, null);
-            var candidate = new UnitCandidate(unit);
-            _candidates.Add(candidate);
-            var i = 0;
-            foreach (var line in File.ReadLines(file))
+            Unit unit = null!;
+            using var fs = File.OpenRead(file);
+            int o = 0;
+            byte[] buf = new byte[4];
+            while (o <= 3 && fs.Read(buf, 0, buf.Length) != -1) switch (o++)
             {
-                if (i++ == 0)
-                {
-                    unit.SetRepr(line);
-                    continue;
-                }
-
-                if (Regex.Match(line, DescriptorPattern) is not { Success: true } match)
-                    throw new Exception("Invalid descriptor: " + line);
-                var other = Get(match.Groups[2].Value);
-                var result = Get(match.Groups[3].Value);
-                switch (match.Groups[1].Value)
-                {
-                    case "*":
-                        candidate.productCandidates[other] = result;
-                        break;
-                    case "/":
-                        candidate.quotientCandidates[other] = result;
-                        break;
-                    default: throw new Exception("Invalid descriptor: " + line);
-                }
+                case 0:
+                    // reserved 4 bytes
+                    if (buf.Any(b => b != 0))
+                    { // unit file needs migration
+                        values.TryRemove(uName, out _);
+                        throw new UnitLoadException();
+                    }
+                    break;
+                case 1:
+                    // repr len
+                    var len = BitConverter.ToInt32(buf);
+                    buf = new byte[len];
+                    break;
+                case 2:
+                    // repr
+                    unit = CreateOrGet(uName, Encoding.ASCII.GetString(buf));
+                    buf = new byte[1];
+                    break;
+                case 3:
+                    if (buf[0] == '\r' && fs.Read(buf, 0, 1) != 1)
+                        throw new Exception("Invalid End of Line");
+                    if (buf[0] != '\n') 
+                        throw new Exception("Linefeed expected");
+                    break;
             }
+
+            if (unit == null)
+                throw new Exception("Assertion failure");
+            var candidate = new UnitCandidate(unit);
+            var ais = new AntlrInputStream(fs);
+            var lex = new MathLexer(ais);
+            var ats = new CommonTokenStream(lex);
+            var par = new MathParser(ats);
+
+            foreach (var equation in new MathCompiler().VisitUnitFile(par.unitFile()))
+            {
+                if (equation is not { type: Component.Type.Equation }
+                    || equation.x is not { type: Component.Type.Op or Component.Type.Root or Component.Type.FuncX } lhs
+                    || equation.y is not { type: Component.Type.Var } rhs)
+                    throw new Exception("Malformed equation: equation must be implicitly 'x(..) = y'");
+                var result = rhs.FindOutputUnit()!;
+                var srcIsX = lhs.x is { type: Component.Type.Var } && (string)lhs.x.arg! == unit.Repr;
+                var input = srcIsX ? lhs.y : lhs.x;
+                var other = input?.FindOutputUnit();
+                if (input?.type == Component.Type.Num)
+                    candidate.evaluatorCandidates[Unit.None] = 
+                        new UnitEvaluator(result, Component.Operator.Multiply, overrideY: (double)input.arg!);
+                else if (other != null && lhs.op is Component.Operator.Multiply or Component.Operator.Divide)
+                    candidate.evaluatorCandidates[other] = new UnitEvaluator(result, lhs.op);
+                else throw new Exception("Malformed equation: Only Multiply or Divide operators are allowed");
+            }
+            _candidates.Add(candidate);
         }
 
-        public void Finalize(MathContext ctx)
+        public void Finalize()
         {
             if (_candidates == null)
                 throw new Exception("Already finalized");
             foreach (var candidate in _candidates)
             {
-                foreach (var (multiplier, product) in candidate.productCandidates)
-                    candidate.unit.AddProduct(multiplier.AsUnit(ctx), product.AsUnit(ctx));
-                foreach (var (dividend, quotient) in candidate.quotientCandidates)
-                    candidate.unit.AddProduct(dividend.AsUnit(ctx), quotient.AsUnit(ctx));
-                candidate.quotientCandidates.Clear();
-                candidate.productCandidates.Clear();
+                foreach (var (other, eval) in candidate.evaluatorCandidates)
+                    candidate.unit[other, eval.op!.Value] = eval;
+                candidate.evaluatorCandidates.Clear();
             }
             _candidates.Clear();
             _candidates = null!;

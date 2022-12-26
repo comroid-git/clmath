@@ -214,7 +214,7 @@ namespace clmath
             ArcTan
         }
 
-        public enum Operator
+        public enum Operator : byte
         {
             Add,
             Subtract,
@@ -250,7 +250,7 @@ namespace clmath
         public object? arg { get; set; }
         public Component[] args { get; set; }
 
-        public List<string> GetVars()
+        public List<string> EnumerateVars()
         {
             if (type == Type.Var)
                 return new List<string> { (arg as string)! };
@@ -264,8 +264,10 @@ namespace clmath
 
             x?.GetVars().ForEach(vars.Add);
             y?.GetVars().ForEach(vars.Add);
-            return vars.Distinct().ToList();
+            return vars;
         }
+        
+        public List<string> GetVars() => EnumerateVars().Distinct().ToList();
 
         public UnitResult Evaluate(MathContext? ctx)
         {
@@ -330,11 +332,12 @@ namespace clmath
                     return new UnitResult(x.Unit, yield).Normalize();
                 case Type.Root:
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
+                    return x!.Root(y);
                     return new UnitResult(SiUnit.None, Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
                 case Type.Abs:
                     return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
                 case Type.Frac:
-                    return x! / y!;
+                    return x!.Divide(y!);
                 case Type.Op:
                     switch (op)
                     {
@@ -343,9 +346,9 @@ namespace clmath
                         case Operator.Subtract:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) - y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
-                            return (x! * y!).Normalize();
+                            return x!.Multiply(y!).Normalize();
                         case Operator.Divide:
-                            return (x! / y!).Normalize();
+                            return x!.Divide(y!).Normalize();
                         case Operator.Modulus:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) % y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
@@ -453,6 +456,13 @@ namespace clmath
             }
 
             return copy;
+        }
+
+        public UnitRef? FindOutputUnit()
+        {
+            if (type is Type.Unit or Type.Var)
+                return new UnitRef((arg as string)!);
+            return x != null ? x.FindOutputUnit() : y?.FindOutputUnit();
         }
     }
 }
