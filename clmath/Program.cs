@@ -352,9 +352,15 @@ namespace clmath
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Error: " + e.Message);
+                    Handle(e);
                 }
             }
+        }
+
+        private static void Handle(Exception e)
+        {
+            Console.WriteLine("Error: " + e.Message);
+            Debug.WriteLine(e);
         }
 
         private static (Component fx, MathContext ctx)[] CreateArgsFuncs(int start, params string[] args)
@@ -535,7 +541,7 @@ namespace clmath
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Error: " + e.Message);
+                        Handle(e);
                     }
                 }
             }
