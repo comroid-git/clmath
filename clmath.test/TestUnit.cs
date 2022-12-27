@@ -9,6 +9,7 @@ namespace clmath.test
         public void SetUp()
         {
             Program.SetUp();
+            Program.SimplePrint = true;
 
             // doesnt matter if these units are already defined; newer information just overrides
             const string packName = "electric";

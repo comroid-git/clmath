@@ -15,6 +15,7 @@ namespace clmath
     {
         public static readonly Random RNG = new();
         public static readonly MathContext BaseContext = new(null);
+        public static bool SimplePrint = false;
         
         private const double factorD2R = Math.PI / 180;
         private const double factorD2G = 1.111111111;
@@ -1178,7 +1179,7 @@ namespace clmath
             foreach (var (key, val) in ctx.Vars())
                 if (includeVar(key)) 
                     AddEntryData(key, val);
-            if (table != null) 
+            if (table != null != !SimplePrint) 
                 Console.Write(table);
         }
 
@@ -1189,8 +1190,13 @@ namespace clmath
             if (amend) entry.Values.Clear();
             ctx.DumpVariables(entry, shouldError, (key) => func.EnumerateVars().Contains(key));
             entry.Values.Add((func, result));
-            Console.Clear();
-            Console.Write(results);
+            if (SimplePrint)
+                Console.WriteLine($"\t{func}\t= {result}");
+            else
+            {
+                Console.Clear();
+                Console.Write(results);
+            }
         }
 
         internal static double IntoDRG(double value)

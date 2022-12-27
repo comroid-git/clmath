@@ -10,6 +10,7 @@ namespace clmath.test
         public void SetUp()
         {
             Program.SetUp();
+            Program.SimplePrint = true;
         }
 
         [Test]
