@@ -1100,6 +1100,7 @@ namespace clmath
             var term = table.AddColumn("Term");
             var expr = table.AddColumn("Value", true);
             ctx.DumpVariables(table, shouldError);
+            table.AddSeparator();
             table.AddRow()
                 .SetData(term, func)
                 .SetData(expr, result);
