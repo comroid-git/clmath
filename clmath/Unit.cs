@@ -353,8 +353,9 @@ namespace clmath
             var lex = new MathLexer(ais);
             var ats = new CommonTokenStream(lex);
             var par = new MathParser(ats);
-
-            foreach (var equation in new MathCompiler().VisitUnitFile(par.unitFile()))
+            var file = par.unitFile();
+            
+            foreach (var equation in new MathCompiler().VisitUnitFile(file))
             {
                 if (equation is not { type: Component.Type.Equation }
                     || equation.x is not { type: Component.Type.Op or Component.Type.Root or Component.Type.FuncX } lhs

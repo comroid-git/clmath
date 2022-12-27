@@ -93,8 +93,8 @@ expr
     | eval                                              #exprEval
     | l=expr op_2 r=expr                                #exprOp2
 ;
-equation: lhs=expr EQUALS rhs=expr;
-unitFile: equation*;
+equation: lhs=expr EQUALS rhs=expr SEMICOLON;
+unitFile: .*? equation*;
 
-WS: [ \n\r\t] -> channel(HIDDEN);
+WS: [ \r\n\t] -> channel(HIDDEN);
 UNMATCHED: . ; // raise errors on unmatched

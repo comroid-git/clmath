@@ -129,7 +129,7 @@ namespace clmath
             for (var i = 1; i < lines.Length; i++)
                 if (Regex.Match(lines[i], OldDescriptorPattern) is { Success: true } match)
                     convert.Add($"{repr}{(match.Groups[1].Value == "p" ? "*" : "/")}" +
-                                $"{match.Groups[2].Value}={match.Groups[3]}");
+                                $"{match.Groups[2].Value}={match.Groups[3]};");
             var newFile = Path.Combine(f.DirectoryName!, uName + UnitExt);
             using var fs = File.OpenWrite(newFile);
             // file head
@@ -962,7 +962,7 @@ namespace clmath
                 $"{unit.Repr}{eval.op switch {
                     Component.Operator.Multiply => '*',
                     Component.Operator.Divide => '/',
-                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr}";
+                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr};";
             foreach (var (other, _, eval) in unit.GetEvaluators()) 
                 fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
             fs.Flush();
