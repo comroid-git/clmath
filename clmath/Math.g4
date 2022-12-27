@@ -58,8 +58,6 @@ word: CHAR (CHAR | DIGIT)*;
 evalVar: name=word EQUALS expr;
 eval: DOLLAR name=word (ACC_L evalVar (SEMICOLON evalVar)* ACC_R)?;
 
-WS: [ \n\r\t] -> channel(HIDDEN);
-
 idxExpr: IDX_L n=expr IDX_R;
 
 op_1
@@ -98,4 +96,5 @@ expr
 equation: lhs=expr EQUALS rhs=expr;
 unitFile: equation*;
 
+WS: [ \n\r\t] -> channel(HIDDEN);
 UNMATCHED: . ; // raise errors on unmatched
