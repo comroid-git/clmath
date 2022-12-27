@@ -18,7 +18,7 @@ namespace clmath.android
         public Button BtnEval { get; private set; }
         public TextView ResultOutput { get; private set; }
         public LinearLayout VarsList { get; private set; }
-        public MathContext Ctx { get; } = new MathContext();
+        public MathContext Ctx { get; } = Program.BaseContext;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -39,7 +39,7 @@ namespace clmath.android
             var func = Program.ParseFunc(FuncInput.Text!);
 
             var vars = func.GetVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
-            if (vars.Any(var => !Ctx.var.ContainsKey(var)))
+            if (vars.Any(var => Ctx.Vars().All(x => x.Key != var)))
             {
                 Snackbar.Make(FuncInput, "Please set all variables and try again", 3000).Show();
                 RefreshVarsList(vars);
@@ -60,7 +60,7 @@ namespace clmath.android
             box.AddView(new TextView(this) { Text = var, Left = 10 });
             box.AddView(input = new EditText(this)
             {
-                Text = Ctx.var.ContainsKey(var) ? Ctx.var[var].ToString() : string.Empty,
+                Text = Ctx.Vars().Any(x => x.Key == var) ? Ctx[var]!.ToString() : string.Empty,
                 Hint = "Value for " + var,
                 Left = 100
             });
@@ -71,7 +71,7 @@ namespace clmath.android
         private void ChangeVar(string var, string text)
         {
             var value = Program.ConvertValueFromString($"{var} = {text}")!.Value.value;
-            Ctx.var[var] = value;
+            Ctx[var] = value;
         }
     }
 }
