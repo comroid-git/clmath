@@ -19,7 +19,7 @@ jobs:
       name: Git Clone Action
       with:
         repository: comroid-git/csapi
-        path: ..
+        path: ../csapi
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
