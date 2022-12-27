@@ -83,7 +83,7 @@ namespace clmath.test
         [Repeat(TestUtil.Repeat)]
         public void TestPrecedence_2()
         {
-            var x = TestUtil.RNG.Next(255);
+            var x = TestUtil.RNG.Next(128);
             var y = TestUtil.RNG.Next(64);
             var z = TestUtil.RNG.Next(8);
 
