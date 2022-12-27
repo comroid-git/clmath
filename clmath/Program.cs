@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
-using winbash.util;
+using comroid.csapi.common;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
