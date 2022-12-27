@@ -72,7 +72,7 @@ namespace clmath
             {
                 fx[i] = funcs[i].fx;
                 ctx[i] = new MathContext(funcs[i].ctx);
-                var vars = fx[i].EnumerateVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
+                var vars = fx[i].GetVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
                 if (vars.Count(s => ctx[i].Vars().All(y => y.Key != s)) > 1)
                 {
                     Console.WriteLine("Error: More than 1 variable is unset");

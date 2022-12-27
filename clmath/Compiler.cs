@@ -6,6 +6,21 @@ namespace clmath
 {
     public class MathCompiler : MathBaseVisitor<Component>
     {
+        public new IEnumerable<Component> VisitUnitFile(MathParser.UnitFileContext unit)
+        {
+            return unit.equation().Select(Visit);
+        }
+
+        public override Component VisitEquation(MathParser.EquationContext context)
+        {
+            return new Component
+            {
+                type = Component.Type.Equation,
+                x = Visit(context.lhs),
+                y = Visit(context.rhs)
+            };
+        }
+
         public override Component VisitExprUnit(MathParser.ExprUnitContext context)
         {
             return new Component
@@ -199,7 +214,7 @@ namespace clmath
             ArcTan
         }
 
-        public enum Operator
+        public enum Operator : byte
         {
             Add,
             Subtract,
@@ -223,7 +238,8 @@ namespace clmath
             Op,
             Mem,
             Parentheses,
-            Unit
+            Unit,
+            Equation
         }
 
         public Type type { get; set; }
@@ -241,15 +257,17 @@ namespace clmath
             List<string> vars = new();
             if (type == Type.Eval)
             {
-                Program.LoadFunc(arg!.ToString()!)?.func.EnumerateVars().ForEach(vars.Add);
+                Program.LoadFunc(arg!.ToString()!)?.func.GetVars().ForEach(vars.Add);
                 foreach (var arg in args)
                     vars.Add(arg.arg!.ToString()!);
             }
 
-            x?.EnumerateVars().ForEach(vars.Add);
-            y?.EnumerateVars().ForEach(vars.Add);
-            return vars.Distinct().ToList();
+            x?.GetVars().ForEach(vars.Add);
+            y?.GetVars().ForEach(vars.Add);
+            return vars;
         }
+        
+        public List<string> GetVars() => EnumerateVars().Distinct().ToList();
 
         public UnitResult Evaluate(MathContext? ctx)
         {
@@ -314,11 +332,12 @@ namespace clmath
                     return new UnitResult(x.Unit, yield).Normalize();
                 case Type.Root:
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
+                    //return x!.Root(y);
                     return new UnitResult(SiUnit.None, Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
                 case Type.Abs:
                     return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
                 case Type.Frac:
-                    return x! / y!;
+                    return x!.Divide(ctx!, y!);
                 case Type.Op:
                     switch (op)
                     {
@@ -327,9 +346,9 @@ namespace clmath
                         case Operator.Subtract:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) - y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
-                            return (x! * y!).Normalize();
+                            return x!.Multiply(ctx!, y!).Normalize();
                         case Operator.Divide:
-                            return (x! / y!).Normalize();
+                            return x!.Divide(ctx!, y!).Normalize();
                         case Operator.Modulus:
                             return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) % y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
@@ -369,6 +388,7 @@ namespace clmath
             switch (type)
             {
                 case Type.Num:
+                    return (arg as double?)?.ToString("0." + new string('#', 15))!;
                 case Type.Var:
                     return arg?.ToString()!;
                 case Type.Mem:
@@ -403,7 +423,9 @@ namespace clmath
                 case Type.Parentheses:
                     return $"({x})";
                 case Type.Unit:
-                    return $"{x}:{arg ?? string.Empty}{(arg != null && this.op == Operator.Modulus ? ":" : string.Empty)}";
+                    return $"{x}{arg ?? string.Empty}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
+                case Type.Equation:
+                    return $"{x} = {y}";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type));
             }
@@ -435,6 +457,13 @@ namespace clmath
             }
 
             return copy;
+        }
+
+        public UnitRef? FindOutputUnit()
+        {
+            if (type is Type.Unit or Type.Var)
+                return new UnitRef((arg as string)!);
+            return x != null ? x.FindOutputUnit() : y?.FindOutputUnit();
         }
     }
 }

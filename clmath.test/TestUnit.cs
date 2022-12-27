@@ -13,66 +13,83 @@ namespace clmath.test
             // doesnt matter if these units are already defined; newer information just overrides
             const string packName = "electric";
             var pack = Program.unitPackages[packName] = new UnitPackage(packName);
-            var volts = pack.Get("V");
-            var ampere = pack.Get("A");
-            var watts = pack.Get("W");
-            var hours = pack.Get("h");
-            var watthours = pack.Get("Wh");
-            volts.AddProduct(ampere, watts);
-            watthours.AddQuotient(hours, watts);
+            var volts = pack.CreateOrGet(string.Empty, "V");
+            var ampere = pack.CreateOrGet(string.Empty, "A");
+            var watts = pack.CreateOrGet(string.Empty, "W");
+            var hours = pack.CreateOrGet(string.Empty, "h");
+            var wattHours = pack.CreateOrGet(string.Empty, "Wh");
+            UnitPackage.AddEval(volts, ampere, watts, Component.Operator.Multiply);
+            UnitPackage.AddEval(wattHours, hours, watts, Component.Operator.Divide);
+            pack.Finalize(Program.BaseContext);
             Program.BaseContext.EnabledUnitPacks.Add(packName);
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleMultiply()
         {
-            const string input = "230[V]*16[A]";
-            const string output = "3.68[kW]";
+            const string input = "230V*16A";
+            const string output = "3.68kW";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_1()
         {
-            const string input = "3680[W]/16[A]";
-            const string output = "230[V]";
+            const string input = "3680W/16A";
+            const string output = "230V";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_2()
         {
-            const string input = "3680[W]/230[V]";
-            const string output = "16[A]";
+            const string input = "3680W/230V";
+            const string output = "16A";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_1()
         {
-            const string input = "1[kWh]/1[h]";
-            const string output = "1[kW]";
+            const string input = "1kWh/1h";
+            const string output = "1kW";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_2()
         {
-            const string input = "1[kWh]/1[kh]";
-            const string output = "1[W]";
+            const string input = "1kWh/1kh";
+            const string output = "1W";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_3()
         {
             const string input = "100*100";
-            const string output = "10000";
+            const string output = "10k";
+
+            Assert.AreEqual(output, TestUtil.CalcTest(input));
+        }
+
+        [Test]
+        [Repeat(TestUtil.Repeat)]
+        public void TestSiPrefix_4()
+        {
+            const string input = "1M?";
+            const string output = "1000000";
 
             Assert.AreEqual(output, TestUtil.CalcTest(input));
         }

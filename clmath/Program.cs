@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
+using comroid.csapi.common;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -63,7 +64,7 @@ namespace clmath
             }
 
             LoadConstants();
-            LoadUnits();
+            LoadUnits(BaseContext);
         }
 
         public static Dictionary<string, double> constants { get; private set; } = null!;
@@ -94,16 +95,55 @@ namespace clmath
                 constants[key] = value.Evaluate(null).Value; // todo: use UnitResult in constants?
         }
 
-        private static void LoadUnits()
+        private static void LoadUnits(MathContext ctx)
         {
             foreach (var pkg in Directory.EnumerateDirectories(dir, $"*{UnitPackExt}"))
             {
                 var packageName = new DirectoryInfo(pkg).Name.StripExtension(UnitPackExt);
                 var package = new UnitPackage(packageName);
                 foreach (var unitFile in Directory.EnumerateFiles(pkg, $"*{UnitExt}"))
-                    package.Load(unitFile);
+                    try
+                    {
+                        package.Load(unitFile);
+                    }
+                    catch (UnitPackage.UnitLoadException)
+                    {
+                        package.Load(MigrateUnitFile(unitFile));
+                    }
                 unitPackages[packageName] = package;
+                package.Finalize(ctx);
             }
+        }
+
+        private static readonly string OldDescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
+        private static string MigrateUnitFile(string unitFile)
+        {
+            Console.WriteLine("Migrating outdated unit file " + unitFile);
+            var f = new FileInfo(unitFile);
+            var repr = f.Name;
+            repr = repr.Substring(0, repr.IndexOf(UnitExt, StringComparison.Ordinal));
+            var lines = File.ReadAllLines(unitFile);
+            var convert = new List<string>();
+            var uName = lines[0];
+            for (var i = 1; i < lines.Length; i++)
+                if (Regex.Match(lines[i], OldDescriptorPattern) is { Success: true } match)
+                    convert.Add($"{repr}{(match.Groups[1].Value == "p" ? "*" : "/")}" +
+                                $"{match.Groups[2].Value}={match.Groups[3]}");
+            var newFile = Path.Combine(f.DirectoryName!, uName + UnitExt);
+            using var fs = File.OpenWrite(newFile);
+            // file head
+            fs.Write(new byte[]{0,0,0,0});
+            var buf = Encoding.ASCII.GetBytes(repr);
+            fs.Write(BitConverter.GetBytes(buf.Length));
+            fs.Write(buf);
+            fs.Write(new[] { (byte)'\n' });
+                
+            // equations
+            foreach (var equation in convert) 
+                fs.Write(Encoding.ASCII.GetBytes(equation + '\n'));
+            fs.Flush();
+            File.Delete(unitFile);
+            return newFile;
         }
 
         private static void SaveConfig()
@@ -252,6 +292,7 @@ namespace clmath
                             Console.WriteLine("\tset <const>\t\t\tDefines a constant");
                             Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
                             Console.WriteLine("\tlist <target>\t\t\tLists things");
+                            Console.WriteLine("\tunit <verb> [args]\t\tModify Units");
                             Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
                             Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
                             Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
@@ -272,6 +313,9 @@ namespace clmath
                             break;
                         case "list":
                             CmdList(BaseContext, cmds);
+                            break;
+                        case "unit":
+                            CmdUnit(BaseContext, cmds);
                             break;
                         case "enable" or "disable":
                             CmdToggleState(cmds, cmds[0] == "enable");
@@ -308,9 +352,15 @@ namespace clmath
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Error: " + e.Message);
+                    Handle(e);
                 }
             }
+        }
+
+        private static void Handle(Exception e)
+        {
+            Console.WriteLine("Error: " + e.Message);
+            Debug.WriteLine(e);
         }
 
         private static (Component fx, MathContext ctx)[] CreateArgsFuncs(int start, params string[] args)
@@ -378,7 +428,7 @@ namespace clmath
 
         private static void EvalFunc(Component func, MathContext ctx, string? f = null)
         {
-            if (func.EnumerateVars().Distinct().All(constants.ContainsKey))
+            if (func.GetVars().Distinct().All(constants.ContainsKey))
             {
                 var res = func.Evaluate(new MathContext(BaseContext));
                 PrintResult(func, res, BaseContext, false);
@@ -401,7 +451,7 @@ namespace clmath
                         {
                             var key = result.key;
                             var value = result.value;
-                            if (value.EnumerateVars().Contains(key))
+                            if (value.GetVars().Contains(key))
                                 Console.WriteLine($"Error: Variable {key} cannot use itself");
                             else if (constants.ContainsKey(key))
                                 Console.WriteLine($"Error: Cannot redefine {key}");
@@ -449,7 +499,7 @@ namespace clmath
                                         "\nSet variables with an equation (example: 'x = 5' or 'y = x * 2')");
                                     break;
                                 case "dump":
-                                    DumpVariables(ctx, func.ToString().Length / 8 + 1);
+                                    DumpVariables(ctx);
                                     break;
                                 case "list":
                                     CmdList(ctx, cmds);
@@ -491,7 +541,7 @@ namespace clmath
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("Error: " + e.Message);
+                        Handle(e);
                     }
                 }
             }
@@ -503,7 +553,7 @@ namespace clmath
                 return;
             lhs ??= new Component { type = Component.Type.Var, arg = cmds[2] };
             var target = cmds[1];
-            var count = func.EnumerateVars().Count(x => x == target);
+            var count = func.GetVars().Count(x => x == target);
             if (count == 0)
             {
                 Console.WriteLine($"Error: Variable {target} was not found in function");
@@ -595,7 +645,7 @@ namespace clmath
             var missing = FindMissingVariables(func, ctx);
             if (missing.Count > 0)
             {
-                DumpVariables(ctx, func.ToString().Length / 8 + 1);
+                DumpVariables(ctx);
                 Console.WriteLine(
                     $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
             }
@@ -710,7 +760,7 @@ namespace clmath
                     foreach (var (fx, ctx0) in stash)
                     {
                         Console.WriteLine($"\tstash[{i0++}]\t= {fx}");
-                        ctx0.DumpVariables("stash[#]".Length / 8 + 1, false);
+                        ctx0.DumpVariables(shouldError: false);
                     }
 
                     break;
@@ -760,11 +810,13 @@ namespace clmath
                     Console.WriteLine($"Units in package '{package.Name}':");
                     foreach (var unit in package.values.Values)
                     {
-                        Console.WriteLine($"\t{unit.DisplayName}");
-                        foreach (var (factor, result) in unit.Products)
-                            Console.WriteLine($"\t\t{unit} = {result} / {factor}");
-                        foreach (var (dividend, result) in unit.Quotients)
-                            Console.WriteLine($"\t\t{unit} = {result} * {dividend}");
+                        Console.WriteLine($"\t{unit.Name}");
+                        foreach (var (other, op, eval) in unit.GetEvaluators())
+                            Console.WriteLine($"{unit}{eval.op switch {
+                                Component.Operator.Multiply => "*",
+                                Component.Operator.Divide => "/",
+                                _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString()
+                                ?? other.Repr} = {eval.output}");
                     }
 
                     break;
@@ -773,6 +825,123 @@ namespace clmath
                         $"Error: Unknown listing target '{cmds[1]}';  options are " + options);
                     break;
             }
+        }
+
+        private static UnitPackage selectedPkg;
+        private static Unit selectedUnit;
+        private static void CmdUnit(MathContext ctx, string[] cmds)
+        {
+            if (IsInvalidArgumentCount(cmds, 2))
+                return;
+
+            void Selection(byte m, string? detail = null)
+            {
+                if (m > 0 && selectedPkg == null)
+                    throw new Exception("No unit pack selected" + (detail == null ? string.Empty : "; " + detail));
+                if (m >= 1 && selectedUnit == null)
+                    throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
+            }
+
+            var table = new TextTable(true, TextTable.LineMode.Unicode);
+            switch (cmds[1])
+            {
+                case "list"/* */:
+                    Selection(0);
+                    var unitName = table.AddColumn("Unit");
+                    var unitRepr = table.AddColumn("ID");
+                    foreach (var unit in selectedPkg.values.Values)
+                        table.AddRow()
+                            .SetData(unitName, unit.Name)
+                            .SetData(unitRepr, unit.Repr);
+                    Console.Write(table);
+                    break;
+                case "sel"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])!;
+                    Selection(1, "unknown unit: " + cmds[2]);
+                    break;
+                case "add"/* <name> <repr> */:
+                    if (IsInvalidArgumentCount(cmds, 4))
+                        return;
+                    Selection(0);
+                    selectedPkg.values[cmds[3]] = selectedUnit = new Unit(selectedPkg, cmds[2], cmds[3]);
+                    selectedUnit.Save();
+                    Selection(1, "unable to add unit: " + cmds[2]);
+                    break;
+                case "del"/* */:
+                    Selection(1);
+                    File.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt, selectedUnit.Name + UnitExt));
+                    selectedPkg.values.Remove(selectedUnit.Repr, out _);
+                    selectedUnit = null!;
+                    break;
+                case "addequ"/* <equation> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    Selection(1);
+                    selectedPkg.ParseEquations(new AntlrInputStream(string.Join(" ", cmds[2..])), selectedUnit);
+                    selectedPkg.Finalize(ctx);
+                    selectedUnit.Save();
+                    break;
+                case "listpkg"/* */:
+                    var pkgName = table.AddColumn("Name");
+                    var unitCount = table.AddColumn("Units");
+                    foreach (var (name, pkg) in unitPackages)
+                        table.AddRow()
+                            .SetData(pkgName, name)
+                            .SetData(unitCount, pkg.values.Count);
+                    Console.Write(table);
+                    break;
+                case "selpkg"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = null!;
+                    selectedPkg = unitPackages.GetValueOrDefault(cmds[2])!;
+                    Selection(0, "unknown package: " + cmds[2]);
+                    break;
+                case "addpkg"/* <name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    selectedUnit = null!;
+                    selectedPkg = unitPackages[cmds[2]] = new UnitPackage(cmds[2]);
+                    Selection(0, "failed to create package: " + cmds[2]);
+                    selectedPkg.Save();
+                    break;
+                case "delpkg"/* */:
+                    Selection(0);
+                    unitPackages.Remove(selectedPkg.Name, out _);
+                    Directory.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt));
+                    selectedPkg = null!;
+                    selectedUnit = null!;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cmds), "Invalid arguments");
+            }
+            Console.WriteLine("OK");
+        }
+
+        private static void Save(this UnitPackage pkg) => Directory.CreateDirectory(Path.Combine(dir, pkg.Name + UnitPackExt));
+
+        private static void Save(this Unit unit)
+        {
+            var path = Path.Combine(dir, unit.Package.Name + UnitPackExt, unit.Name + UnitExt);
+            using var fs = File.OpenWrite(path);
+            // file head
+            fs.Write(new byte[]{0,0,0,0});
+            var buf = Encoding.ASCII.GetBytes(unit.Repr);
+            fs.Write(BitConverter.GetBytes(buf.Length));
+            fs.Write(buf);
+            fs.Write(new[] { (byte)'\n' });
+                
+            // equations
+            string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval) =>
+                $"{unit.Repr}{eval.op switch {
+                    Component.Operator.Multiply => '*',
+                    Component.Operator.Divide => '/',
+                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? unit.Repr}={eval.output.Repr}";
+            foreach (var (other, _, eval) in unit.GetEvaluators()) 
+                fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
+            fs.Flush();
         }
 
         private static void CmdToggleState(string[] cmds, bool newState)
@@ -922,7 +1091,7 @@ namespace clmath
             foreach (var var in ctx.Vars()
                          .Select(x => x.Value)
                          .Append(func)
-                         .SelectMany(it => it.EnumerateVars())
+                         .SelectMany(it => it.GetVars())
                          .Distinct())
                 if (ctx.Vars().All(x => x.Key != var))
                     missing.Add(var);
@@ -936,34 +1105,49 @@ namespace clmath
             _graph = new Graph(funcs);
         }
 
-        private static int DumpVariables(this MathContext ctx, int alignBase = 1, bool shouldError = true)
+        private static void DumpVariables(this MathContext ctx, TextTable? table = null, bool shouldError = true)
         {
+            TextTable.Column term, expr;
+            bool newTable = table == null;
+            if (table == null)
+            {
+                table = new TextTable(true, TextTable.LineMode.Unicode);
+                term = table.AddColumn("Variable");
+                expr = table.AddColumn("Value", true);
+            }
+            else
+            {
+                term = table.Columns[0];
+                expr = table.Columns[1];
+            }
             if (!ctx.Vars().Any())
             {
                 if (shouldError)
                     Console.WriteLine("Error: No variables are set");
-                return 1;
+                return;
             }
-
-            var maxAlign = ctx.Vars().Select(x => x.Key).Max(key => key.Length) / 8;
             foreach (var (key, val) in ctx.Vars())
             {
-                var align = Math.Max(maxAlign > 0 ? maxAlign - alignBase : alignBase,
-                    maxAlign - (key.Length / 8 + 1) + alignBase);
-                var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-                Console.WriteLine($"\t{key}{spacer}= {val}");
+                table.AddRow()
+                    .SetData(term, key)
+                    .SetData(expr, val);
             }
-
-            return maxAlign;
+            if (newTable) 
+                Console.Write(table);
         }
 
         private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
         {
-            ctx[0] = result;
-            var funcAlign = func.ToString().Length / 8 + 1;
-            var align = Math.Max(1, (ctx?.DumpVariables(funcAlign, shouldError) ?? 1) - funcAlign);
-            var spacer = Enumerable.Range(0, align).Aggregate(string.Empty, (str, _) => str + '\t');
-            Console.WriteLine($"\t{func}{spacer}= {result}");
+            ctx[0] = result; // push result to mem
+            var table = new TextTable(true, TextTable.LineMode.Unicode);
+            var term = table.AddColumn("Term");
+            var expr = table.AddColumn("Value", true);
+            ctx.DumpVariables(table, shouldError);
+            table.AddSeparator();
+            table.AddRow()
+                .SetData(term, func)
+                .SetData(expr, result);
+            Console.Write(table);
         }
 
         internal static double IntoDRG(double value)
@@ -994,6 +1178,17 @@ namespace clmath
                 str = str.Substring(0, str.IndexOf(ext, StringComparison.Ordinal));
             return str;
         }
+
+        internal static double Evaluate(this Component.Operator op, double x, double y) => op switch
+        {
+            Component.Operator.Add => x + y,
+            Component.Operator.Subtract => x - y,
+            Component.Operator.Multiply => x * y,
+            Component.Operator.Divide => x / y,
+            Component.Operator.Modulus => x % y,
+            Component.Operator.Power => Math.Pow(x, y),
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Invalid Operator")
+        };
     }
 
     public enum CalcMode : byte
@@ -1056,5 +1251,8 @@ namespace clmath
                 .Select(pkg => pkg.Value)
                 .ToArray();
         }
+
+        public Unit? FindUnit(string id) =>
+            GetUnitPackages().SelectMany(x => x.values.Values).FirstOrDefault(x => x.Repr == id);
     }
 }

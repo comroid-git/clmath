@@ -1,26 +1,19 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 
 namespace clmath.test
 {
     public static class TestUtil
     {
+        public const int Repeat = 1000;
+        
         public static string CalcTest(string input)
         {
-            var bak = Console.In;
-            var writer = new StringWriter();
             Console.SetIn(new StringReader("\n"));
-            Console.SetOut(writer);
             Program.Main(input);
-            Console.SetIn(bak);
-
-            var written = writer.ToString();
-            var start = written.IndexOf("=", StringComparison.Ordinal);
-            var end = written.IndexOf(Environment.NewLine, StringComparison.Ordinal) - 2;
-            if (start == -1) Assert.Fail("No output");
-            var output = written.Substring(start + 2, end - start);
-            return output;
+            return Program.BaseContext[0].ToString();
         }
 
         public static string SolverTest(string input, string solveFor, string solveWith)
