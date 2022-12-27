@@ -1090,7 +1090,7 @@ namespace clmath
                     .SetData(expr, val);
             }
             if (newTable) 
-                Console.WriteLine(table);
+                Console.Write(table);
         }
 
         private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
@@ -1103,7 +1103,7 @@ namespace clmath
             table.AddRow()
                 .SetData(term, func)
                 .SetData(expr, result);
-            Console.WriteLine(table);
+            Console.Write(table);
         }
 
         internal static double IntoDRG(double value)
