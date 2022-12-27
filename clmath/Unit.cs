@@ -201,11 +201,14 @@ namespace clmath
 
     public sealed class Unit : AbstractUnit
     {
+        internal bool Finalized = false;
+        public readonly UnitPackage Package;
         public static readonly Unit None = new(UnitPackage.None, string.Empty, string.Empty);
         private readonly ConcurrentDictionary<(string repr, Component.Operator op), UnitEvaluator> Evaluators = new();
 
         internal Unit(UnitPackage package, string name, string repr)
         {
+            Package = package;
             Name = name;
             Repr = repr;
         }
@@ -343,7 +346,11 @@ namespace clmath
 
             if (unit == null)
                 throw new Exception("Assertion failure");
-            var ais = new AntlrInputStream(fs);
+            ParseEquations(new AntlrInputStream(fs), unit);
+        }
+
+        internal void ParseEquations(AntlrInputStream ais, Unit unit)
+        {
             var lex = new MathLexer(ais);
             var ats = new CommonTokenStream(lex);
             var par = new MathParser(ats);
@@ -372,33 +379,38 @@ namespace clmath
             void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) =>
                 inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
             foreach (var inputA in values.Values)
-            foreach (var (other, op, eval) in inputA.GetEvaluators())
             {
-                var inputB = other?.AsUnit(ctx);
-                var output = eval.output.AsUnit(ctx);
-                switch (op)
+                if (inputA.Finalized)
+                    continue;
+                foreach (var (other, op, eval) in inputA.GetEvaluators())
                 {
-                    case Component.Operator.Multiply:
-                        if (inputB != null)
-                        {
-                            AddEval(inputB, inputA, output, Component.Operator.Multiply);
-                            AddEval(output, inputA, inputB, Component.Operator.Divide);
-                            AddEval(output, inputB, inputA, Component.Operator.Divide);
-                        }
-                        else AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
-                        break;
-                    case Component.Operator.Divide:
-                        if (inputB != null)
-                        {
-                            AddEval(inputA, output, inputB, Component.Operator.Divide);
-                            AddEval(inputB, output, inputA, Component.Operator.Multiply);
-                            AddEval(output, inputB, inputA, Component.Operator.Multiply);
-                        }
-                        else AddEval(output, Unit.None, inputA, Component.Operator.Multiply, eval.overrideY);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(eval.op));
+                    var inputB = other?.AsUnit(ctx);
+                    var output = eval.output.AsUnit(ctx);
+                    switch (op)
+                    {
+                        case Component.Operator.Multiply:
+                            if (inputB != null)
+                            {
+                                AddEval(inputB, inputA, output, Component.Operator.Multiply);
+                                AddEval(output, inputA, inputB, Component.Operator.Divide);
+                                AddEval(output, inputB, inputA, Component.Operator.Divide);
+                            }
+                            else AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
+                            break;
+                        case Component.Operator.Divide:
+                            if (inputB != null)
+                            {
+                                AddEval(inputA, output, inputB, Component.Operator.Divide);
+                                AddEval(inputB, output, inputA, Component.Operator.Multiply);
+                                AddEval(output, inputB, inputA, Component.Operator.Multiply);
+                            }
+                            else AddEval(output, Unit.None, inputA, Component.Operator.Multiply, eval.overrideY);
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(eval.op));
+                    }
                 }
+                inputA.Finalized = true;
             }
         }
 

@@ -836,13 +836,13 @@ namespace clmath
 
             void Selection(byte m, string? detail = null)
             {
-                if (m == 0 && selectedPkg == null)
+                if (m > 0 && selectedPkg == null)
                     throw new Exception("No unit pack selected" + (detail == null ? string.Empty : "; " + detail));
-                if (m == 1 && selectedUnit == null)
+                if (m >= 1 && selectedUnit == null)
                     throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
             }
 
-            TextTable table = new TextTable(true, TextTable.LineMode.Unicode);
+            var table = new TextTable(true, TextTable.LineMode.Unicode);
             switch (cmds[1])
             {
                 case "list"/* */:
@@ -853,7 +853,7 @@ namespace clmath
                         table.AddRow()
                             .SetData(unitName, unit.Name)
                             .SetData(unitRepr, unit.Repr);
-                    Console.WriteLine(table);
+                    Console.Write(table);
                     break;
                 case "sel"/* <name> */:
                     if (IsInvalidArgumentCount(cmds, 3))
@@ -861,15 +861,27 @@ namespace clmath
                     selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])!;
                     Selection(1, "unknown unit: " + cmds[2]);
                     break;
-                case "add"/* <namee> <repr> */:
+                case "add"/* <name> <repr> */:
                     if (IsInvalidArgumentCount(cmds, 4))
                         return;
+                    Selection(0);
+                    selectedPkg.values[cmds[3]] = selectedUnit = new Unit(selectedPkg, cmds[2], cmds[3]);
+                    selectedUnit.Save();
+                    Selection(1, "unable to add unit: " + cmds[2]);
                     break;
                 case "del"/* */:
+                    Selection(1);
+                    File.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt, selectedUnit.Name + UnitExt));
+                    selectedPkg.values.Remove(selectedUnit.Repr, out _);
+                    selectedUnit = null!;
                     break;
                 case "addequ"/* <equation> */:
                     if (IsInvalidArgumentCount(cmds, 3))
                         return;
+                    Selection(1);
+                    selectedPkg.ParseEquations(new AntlrInputStream(string.Join(" ", cmds[2..])), selectedUnit);
+                    selectedPkg.Finalize(ctx);
+                    selectedUnit.Save();
                     break;
                 case "listpkg"/* */:
                     var pkgName = table.AddColumn("Name");
@@ -878,7 +890,7 @@ namespace clmath
                         table.AddRow()
                             .SetData(pkgName, name)
                             .SetData(unitCount, pkg.values.Count);
-                    Console.WriteLine(table);
+                    Console.Write(table);
                     break;
                 case "selpkg"/* <name> */:
                     if (IsInvalidArgumentCount(cmds, 3))
@@ -893,12 +905,43 @@ namespace clmath
                     selectedUnit = null!;
                     selectedPkg = unitPackages[cmds[2]] = new UnitPackage(cmds[2]);
                     Selection(0, "failed to create package: " + cmds[2]);
+                    selectedPkg.Save();
                     break;
                 case "delpkg"/* */:
+                    Selection(0);
+                    unitPackages.Remove(selectedPkg.Name, out _);
+                    Directory.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt));
+                    selectedPkg = null!;
+                    selectedUnit = null!;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cmds), "Invalid arguments");
             }
+            Console.WriteLine("OK");
+        }
+
+        private static void Save(this UnitPackage pkg) => Directory.CreateDirectory(Path.Combine(dir, pkg.Name + UnitPackExt));
+
+        private static void Save(this Unit unit)
+        {
+            var path = Path.Combine(dir, unit.Package.Name + UnitPackExt, unit.Name + UnitExt);
+            using var fs = File.OpenWrite(path);
+            // file head
+            fs.Write(new byte[]{0,0,0,0});
+            var buf = Encoding.ASCII.GetBytes(unit.Repr);
+            fs.Write(BitConverter.GetBytes(buf.Length));
+            fs.Write(buf);
+            fs.Write(new[] { (byte)'\n' });
+                
+            // equations
+            string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval) =>
+                $"{unit.Repr}{eval.op switch {
+                    Component.Operator.Multiply => '*',
+                    Component.Operator.Divide => '/',
+                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? unit.Repr}={eval.output.Repr}";
+            foreach (var (other, _, eval) in unit.GetEvaluators()) 
+                fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
+            fs.Flush();
         }
 
         private static void CmdToggleState(string[] cmds, bool newState)
