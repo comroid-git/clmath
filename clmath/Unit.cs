@@ -217,7 +217,7 @@ namespace clmath
 
         internal UnitEvaluator this[AbstractUnit other, Component.Operator op]
         {
-            get => Evaluators.GetValueOrDefault((other.Repr, op)) ?? new UnitEvaluator(other, op);
+            get => Evaluators.GetValueOrDefault((other.Repr, op)) ?? new UnitEvaluator(new UnitRef(other.Repr), op);
             set => Evaluators[(other.Repr, op)] = value;
         }
 

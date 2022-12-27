@@ -86,5 +86,14 @@ namespace clmath.test
 
             Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
+
+        [Test]
+        public void TestSiPrefix_5()
+        {
+            const string input = "1k*1k*1k";
+            const string output = "1G";
+
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
+        }
     }
 }
