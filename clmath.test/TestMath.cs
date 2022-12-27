@@ -85,7 +85,7 @@ namespace clmath.test
         {
             var x = TestUtil.RNG.Next(128);
             var y = TestUtil.RNG.Next(64);
-            var z = TestUtil.RNG.Next(8);
+            var z = TestUtil.RNG.Next(4);
 
             Assert.AreEqual(x * Math.Pow(y, z), TestUtil.CalcTest($"{x}*{y}^{z}").As(), 0.01);
         }
