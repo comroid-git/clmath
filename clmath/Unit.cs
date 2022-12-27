@@ -374,10 +374,10 @@ namespace clmath
             }
         }
 
+        public static void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) =>
+            inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
         public void Finalize(MathContext ctx)
         {
-            void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) =>
-                inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
             foreach (var inputA in values.Values)
             {
                 if (inputA.Finalized)

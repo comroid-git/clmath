@@ -13,13 +13,13 @@ namespace clmath.test
             // doesnt matter if these units are already defined; newer information just overrides
             const string packName = "electric";
             var pack = Program.unitPackages[packName] = new UnitPackage(packName);
-            var volts = pack.Get("V");
-            var ampere = pack.Get("A");
-            var watts = pack.Get("W");
-            var hours = pack.Get("h");
-            var watthours = pack.Get("Wh");
-            volts.AddProduct(ampere, watts);
-            watthours.AddQuotient(hours, watts);
+            var volts = pack.CreateOrGet(string.Empty, "V");
+            var ampere = pack.CreateOrGet(string.Empty, "A");
+            var watts = pack.CreateOrGet(string.Empty, "W");
+            var hours = pack.CreateOrGet(string.Empty, "h");
+            var wattHours = pack.CreateOrGet(string.Empty, "Wh");
+            UnitPackage.AddEval(volts, ampere, watts, Component.Operator.Multiply);
+            UnitPackage.AddEval(wattHours, hours, watts, Component.Operator.Divide);
             Program.BaseContext.EnabledUnitPacks.Add(packName);
         }
 
