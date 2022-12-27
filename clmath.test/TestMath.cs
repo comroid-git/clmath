@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System;
+using NUnit.Framework;
 
 namespace clmath.test
 {
@@ -12,68 +13,58 @@ namespace clmath.test
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
-        public void TestSquare()
+        public void TestPi()
         {
-            const string input = "4^2";
-            const string output = "16";
-
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(Math.PI, TestUtil.CalcTest($"pi").As(), TestUtil.Delta);
         }
 
         [Test]
         [Repeat(TestUtil.Repeat)]
-        public void TestCubic()
+        public void TestPow()
         {
-            const string input = "4^3";
-            const string output = "64";
+            var x = TestUtil.Random();
+            var y = TestUtil.RandomI();
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(Math.Pow(x, y), TestUtil.CalcTest($"{x}^{y}").As(), TestUtil.Delta);
         }
 
         [Test]
         [Repeat(TestUtil.Repeat)]
         public void TestFactorial()
         {
-            const string input = "5!";
-            const string output = "120";
+            var x = TestUtil.RNG.Next(12);
+            var result = 1;
+            for (var rem = x; rem > 0; rem--)
+                result *= rem;
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(result, TestUtil.CalcTest($"{x}!").As(), TestUtil.Delta);
         }
 
         [Test]
         [Repeat(TestUtil.Repeat)]
         public void TestFraction()
         {
-            const string input = "frac(1)(2)";
-            const string output = "0.5";
+            var x = TestUtil.Random();
+            var y = TestUtil.Random();
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(x / y, TestUtil.CalcTest($"frac({x})({y})").As(), TestUtil.Delta);
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestRad()
         {
-            const string input = "sin(90)";
-            const string output = "1";
-
             var bak = Program.DRG;
             Program.DRG = CalcMode.Rad;
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(1, TestUtil.CalcTest("sin(90)").As(), TestUtil.Delta);
             Program.DRG = bak;
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestGrad()
         {
-            const string input = "sin(1)";
-            const string output = "0.89619220098066";//01 removed
-
             var bak = Program.DRG;
             Program.DRG = CalcMode.Grad;
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(0.8961922009806601d, TestUtil.CalcTest("sin(1)").As(), TestUtil.Delta);
             Program.DRG = bak;
         }
 
@@ -81,20 +72,22 @@ namespace clmath.test
         [Repeat(TestUtil.Repeat)]
         public void TestPrecedence_1()
         {
-            const string input = "1+2*3";
-            const string output = "7";
+            var x = TestUtil.RNG.Next(255);
+            var y = TestUtil.RNG.Next(255);
+            var z = TestUtil.RNG.Next(255);
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(x + y * z, TestUtil.CalcTest($"{x}+{y}*{z}").As(), TestUtil.Delta);
         }
 
         [Test]
         [Repeat(TestUtil.Repeat)]
         public void TestPrecedence_2()
         {
-            const string input = "3*2^2";
-            const string output = "12";
+            var x = TestUtil.RNG.Next(255);
+            var y = TestUtil.RNG.Next(64);
+            var z = TestUtil.RNG.Next(8);
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(x * Math.Pow(y, z), TestUtil.CalcTest($"{x}*{y}^{z}").As(), 0.01);
         }
     }
 }

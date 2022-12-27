@@ -8,12 +8,14 @@ namespace clmath.test
     public static class TestUtil
     {
         public const int Repeat = 1000;
-        
-        public static string CalcTest(string input)
+        public const double Delta = 0.000_000_000_1d;
+        public static readonly Random RNG = new();
+
+        public static UnitResult CalcTest(string input)
         {
             Console.SetIn(new StringReader("\n"));
-            Program.Main(input);
-            return Program.BaseContext[0].ToString();
+            lock (RNG) Program.Main(input);
+            return Program.BaseContext[0];
         }
 
         public static string SolverTest(string input, string solveFor, string solveWith)
@@ -22,7 +24,7 @@ namespace clmath.test
             var writer = new StringWriter();
             Console.SetIn(new StringReader("exit\n"));
             Console.SetOut(writer);
-            Program.Main("solve", solveFor, solveWith, input);
+            lock (RNG) Program.Main("solve", solveFor, solveWith, input);
             Console.SetIn(bak);
 
             var written = writer.ToString();
@@ -31,5 +33,9 @@ namespace clmath.test
             var output = written.Substring(0, cut);
             return output;
         }
+
+        public static int RandomI() => RNG.Next();
+        public static double RandomD() => RNG.Next();
+        public static double Random() => RandomD() + RandomI();
     }
 }

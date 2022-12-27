@@ -342,15 +342,15 @@ namespace clmath
                     switch (op)
                     {
                         case Operator.Add:
-                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) + y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) + SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Subtract:
-                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) - y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) - SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
                             return x!.Multiply(ctx!, y!).Normalize();
                         case Operator.Divide:
                             return x!.Divide(ctx!, y!).Normalize();
                         case Operator.Modulus:
-                            return new UnitResult(x!.Unit, x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value) % y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) % SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
                             return new UnitResult(x!.Unit, Math.Pow(x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value), y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value))).Normalize();
                         case null: throw new Exception("invalid state");

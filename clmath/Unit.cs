@@ -125,6 +125,8 @@ namespace clmath
             return SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value), preferredPrefix);
         }
 
+        public double As(SiPrefix? prefix = null) => Normalize(prefix ?? SiPrefix.None).Value;
+
         public override string ToString()
         {
             return Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) +

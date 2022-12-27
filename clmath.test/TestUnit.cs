@@ -25,73 +25,66 @@ namespace clmath.test
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSimpleMultiply()
         {
             const string input = "230V*16A";
             const string output = "3.68kW";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_1()
         {
             const string input = "3680W/16A";
             const string output = "230V";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_2()
         {
             const string input = "3680W/230V";
             const string output = "16A";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_1()
         {
             const string input = "1kWh/1h";
             const string output = "1kW";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_2()
         {
             const string input = "1kWh/1kh";
             const string output = "1W";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_3()
         {
             const string input = "100*100";
             const string output = "10k";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
 
         [Test]
-        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_4()
         {
             const string input = "1M?";
             const string output = "1000000";
 
-            Assert.AreEqual(output, TestUtil.CalcTest(input));
+            Assert.AreEqual(output, TestUtil.CalcTest(input).ToString());
         }
     }
 }
