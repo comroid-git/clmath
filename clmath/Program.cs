@@ -355,6 +355,11 @@ namespace clmath
                         case "graph":
                             StartGraph(cmds.Length == 1 ? stash.ToArray() : CreateArgsFuncs(1, cmds));
                             break;
+                        case "copy" or "clip":
+                            if (!BaseContext.Mem().Any())
+                                throw new Exception("No variables in memory");
+                            CmdCopy(BaseContext[0].ToString());
+                            break;
                         case "reset":
                             _resetting = true;
                             break;
@@ -547,6 +552,11 @@ namespace clmath
                                 case "eval":
                                     CmdEval(func, ctx, cc++ > 0);
                                     break;
+                                case "copy" or "clip":
+                                    if (!BaseContext.Mem().Any())
+                                        throw new Exception("No variables in memory");
+                                    CmdCopy(ctx[0].ToString());
+                                    break;
                                 case "reset":
                                     _resetting = true;
                                     return;
@@ -562,6 +572,20 @@ namespace clmath
                     }
                 }
             }
+        }
+
+        private static void CmdCopy(string data)
+        { // todo: support for non Windows OS
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT
+                && Environment.OSVersion.Platform != PlatformID.Win32Windows
+                && Environment.OSVersion.Platform != PlatformID.Win32S
+                && Environment.OSVersion.Platform != PlatformID.WinCE)
+                throw new Exception("This command is only available on Windows machines");
+            var startInfo = new ProcessStartInfo("C:\\Windows\\System32\\cmd.exe")
+                { Arguments = $"/k \"(echo {data}| clip) & exit\"" };
+            var process = new Process() { StartInfo = startInfo };
+            process.Start();
+            process.WaitForExit();
         }
 
         private static void CmdSolve(string[] cmds, Component? lhs, Component func, MathContext ctx)
