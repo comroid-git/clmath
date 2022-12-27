@@ -842,7 +842,7 @@ namespace clmath
                     throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
             }
 
-            TextTable table = new TextTable(true, true);
+            TextTable table = new TextTable(true, TextTable.LineMode.Unicode);
             switch (cmds[1])
             {
                 case "list"/* */:
@@ -1068,7 +1068,7 @@ namespace clmath
             bool newTable = table == null;
             if (table == null)
             {
-                table = new TextTable(true, true);
+                table = new TextTable(true, TextTable.LineMode.Unicode);
                 term = table.AddColumn("Variable");
                 expr = table.AddColumn("Value", true);
             }
@@ -1096,7 +1096,7 @@ namespace clmath
         private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
         {
             ctx[0] = result; // push result to mem
-            var table = new TextTable(true, true);
+            var table = new TextTable(true, TextTable.LineMode.Unicode);
             var term = table.AddColumn("Term");
             var expr = table.AddColumn("Value", true);
             ctx.DumpVariables(table, shouldError);
