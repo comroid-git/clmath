@@ -127,7 +127,7 @@ namespace clmath
 
         public override string ToString()
         {
-            return Value.ToString("0." + new string('#', 15), CultureInfo.InvariantCulture) +
+            return Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) +
                    (Unit.ToString() == string.Empty ? string.Empty : $"{Unit}");
         }
     }
@@ -215,7 +215,7 @@ namespace clmath
 
         internal UnitEvaluator this[AbstractUnit other, Component.Operator op]
         {
-            get => Evaluators[(other.Repr, op)];
+            get => Evaluators.GetValueOrDefault((other.Repr, op)) ?? new UnitEvaluator(other, op);
             set => Evaluators[(other.Repr, op)] = value;
         }
 
@@ -224,23 +224,6 @@ namespace clmath
 
         protected internal override Unit AsUnit(MathContext? ctx = null) => this;
 
-        /*
-        private void AddProduct(Unit other, Unit result)
-        {
-            Products[other] = result;
-            other.Products[this] = result;
-            result.Quotients[this] = other;
-            result.Quotients[other] = this;
-        }
-
-        private void AddQuotient(Unit other, Unit result)
-        {
-            Quotients[other] = result;
-            Quotients[result] = other;
-            other.Products[result] = this;
-            result.Products[other] = this;
-        }
-        */
         public IEnumerable<(UnitRef other, Component.Operator op, UnitEvaluator eval)> GetEvaluators() => Evaluators
             .Select((entry) => (new UnitRef(entry.Key.repr), entry.Key.op, entry.Value));
     }

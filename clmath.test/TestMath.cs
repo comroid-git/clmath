@@ -63,7 +63,7 @@ namespace clmath.test
         public void TestGrad()
         {
             const string input = "sin(1)";
-            const string output = "0.8961922009806601";
+            const string output = "0.89619220098066";//01 removed
 
             var bak = Program.DRG;
             Program.DRG = CalcMode.Grad;
