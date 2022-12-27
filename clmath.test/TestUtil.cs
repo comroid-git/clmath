@@ -14,6 +14,7 @@ namespace clmath.test
         public static UnitResult CalcTest(string input)
         {
             Console.SetIn(new StringReader("\n"));
+            Console.SetOut(new StringWriter());
             lock (RNG) Program.Main(input);
             return Program.BaseContext[0];
         }
