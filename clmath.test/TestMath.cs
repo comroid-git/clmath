@@ -12,6 +12,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSquare()
         {
             const string input = "4^2";
@@ -21,6 +22,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestCubic()
         {
             const string input = "4^3";
@@ -30,6 +32,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestFactorial()
         {
             const string input = "5!";
@@ -39,6 +42,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestFraction()
         {
             const string input = "frac(1)(2)";
@@ -48,6 +52,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestRad()
         {
             const string input = "sin(90)";
@@ -60,6 +65,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestGrad()
         {
             const string input = "sin(1)";
@@ -72,6 +78,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestPrecedence_1()
         {
             const string input = "1+2*3";
@@ -81,6 +88,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestPrecedence_2()
         {
             const string input = "3*2^2";

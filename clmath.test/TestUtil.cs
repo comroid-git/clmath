@@ -7,6 +7,8 @@ namespace clmath.test
 {
     public static class TestUtil
     {
+        public const int Repeat = 1000;
+        
         public static string CalcTest(string input)
         {
             Console.SetIn(new StringReader("\n"));

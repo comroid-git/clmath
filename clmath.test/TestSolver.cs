@@ -12,6 +12,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSquare()
         {
             const string input = "x^2";
@@ -21,6 +22,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestQuadric()
         {
             const string input = "x^3";
@@ -30,6 +32,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestPythagoras()
         {
             const string input = "sqrt(a^2+b^2)";
@@ -39,6 +42,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestACos()
         {
             const string input = "acos(P/S)";
@@ -48,6 +52,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestAdvanced_1()
         {
             const string input = "(x^3)/5";
@@ -56,7 +61,9 @@ namespace clmath.test
             Assert.AreEqual(output, TestUtil.SolverTest(input, "x", "y"));
         }
 
-        //[Test] todo: fix the solver
+        
+        [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestAdvanced_2()
         {
             const string input = "frac(XL)(2*pi*f)";
@@ -66,6 +73,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestAdvanced_3()
         {
             const string input = "frac(b+c)(2)*d";
@@ -75,6 +83,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestAdvanced_4()
         {
             const string input = "frac(b+c)(2)*d";

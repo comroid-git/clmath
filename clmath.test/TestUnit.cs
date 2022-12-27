@@ -25,6 +25,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleMultiply()
         {
             const string input = "230V*16A";
@@ -34,6 +35,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_1()
         {
             const string input = "3680W/16A";
@@ -43,6 +45,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSimpleDivide_2()
         {
             const string input = "3680W/230V";
@@ -52,6 +55,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_1()
         {
             const string input = "1kWh/1h";
@@ -61,6 +65,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_2()
         {
             const string input = "1kWh/1kh";
@@ -70,6 +75,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_3()
         {
             const string input = "100*100";
@@ -79,6 +85,7 @@ namespace clmath.test
         }
 
         [Test]
+        [Repeat(TestUtil.Repeat)]
         public void TestSiPrefix_4()
         {
             const string input = "1M?";
