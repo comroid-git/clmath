@@ -112,6 +112,7 @@ namespace clmath
                     }
                 unitPackages[packageName] = package;
                 package.Finalize(ctx);
+                package.Save();
             }
         }
 
@@ -834,9 +835,9 @@ namespace clmath
             if (IsInvalidArgumentCount(cmds, 2))
                 return;
 
-            void Selection(byte m, string? detail = null)
+            void Selection(int m, string? detail = null)
             {
-                if (m > 0 && selectedPkg == null)
+                if (m >= 0 && selectedPkg == null)
                     throw new Exception("No unit pack selected" + (detail == null ? string.Empty : "; " + detail));
                 if (m >= 1 && selectedUnit == null)
                     throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
@@ -858,7 +859,8 @@ namespace clmath
                 case "sel"/* <name> */:
                     if (IsInvalidArgumentCount(cmds, 3))
                         return;
-                    selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])!;
+                    selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])
+                                   ?? selectedPkg.values.Values.FirstOrDefault(x => x.Name == cmds[2])!;
                     Selection(1, "unknown unit: " + cmds[2]);
                     break;
                 case "add"/* <name> <repr> */:
@@ -866,8 +868,26 @@ namespace clmath
                         return;
                     Selection(0);
                     selectedPkg.values[cmds[3]] = selectedUnit = new Unit(selectedPkg, cmds[2], cmds[3]);
-                    selectedUnit.Save();
                     Selection(1, "unable to add unit: " + cmds[2]);
+                    break;
+                case "rename"/* <new_name> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    Selection(1);
+                    selectedUnit.Name = cmds[2];
+                    File.Move(Path.Combine(dir, selectedPkg.Name + UnitPackExt, selectedUnit.Name + UnitExt),
+                        Path.Combine(dir, selectedPkg.Name + UnitPackExt, cmds[2] + UnitExt));
+                    break;
+                case "id"/* <new_id> */:
+                    if (IsInvalidArgumentCount(cmds, 3))
+                        return;
+                    Selection(1);
+                    if (selectedPkg.values.Values.Any(x => x.Repr == cmds[2]))
+                        throw new Exception("ID already taken: " + cmds[2]);
+                    var old = selectedUnit.Repr;
+                    selectedPkg.values[selectedUnit._repr = cmds[2]] = selectedPkg.values[old];
+                    selectedPkg.values.Remove(old, out _);
+                    UnitRef.NotifyNameChange(old, selectedUnit.Repr);
                     break;
                 case "del"/* */:
                     Selection(1);
@@ -881,7 +901,6 @@ namespace clmath
                     Selection(1);
                     selectedPkg.ParseEquations(new AntlrInputStream(string.Join(" ", cmds[2..])), selectedUnit);
                     selectedPkg.Finalize(ctx);
-                    selectedUnit.Save();
                     break;
                 case "listpkg"/* */:
                     var pkgName = table.AddColumn("Name");
@@ -905,7 +924,6 @@ namespace clmath
                     selectedUnit = null!;
                     selectedPkg = unitPackages[cmds[2]] = new UnitPackage(cmds[2]);
                     Selection(0, "failed to create package: " + cmds[2]);
-                    selectedPkg.Save();
                     break;
                 case "delpkg"/* */:
                     Selection(0);
@@ -917,10 +935,16 @@ namespace clmath
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cmds), "Invalid arguments");
             }
+            selectedPkg?.Save();
             Console.WriteLine("OK");
         }
 
-        private static void Save(this UnitPackage pkg) => Directory.CreateDirectory(Path.Combine(dir, pkg.Name + UnitPackExt));
+        private static void Save(this UnitPackage pkg)
+        {
+            foreach (var unit in pkg.values.Values)
+                unit.Save();
+            Directory.CreateDirectory(Path.Combine(dir, pkg.Name + UnitPackExt));
+        }
 
         private static void Save(this Unit unit)
         {
@@ -938,7 +962,7 @@ namespace clmath
                 $"{unit.Repr}{eval.op switch {
                     Component.Operator.Multiply => '*',
                     Component.Operator.Divide => '/',
-                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? unit.Repr}={eval.output.Repr}";
+                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr}";
             foreach (var (other, _, eval) in unit.GetEvaluators()) 
                 fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
             fs.Flush();

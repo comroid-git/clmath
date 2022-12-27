@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Transactions;
 using Antlr4.Runtime;
 using clmath.Antlr;
+// ReSharper disable ArrangeObjectCreationWhenTypeEvident
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -212,7 +213,7 @@ namespace clmath
         {
             Package = package;
             Name = name;
-            Repr = repr;
+            _repr = repr;
         }
 
         internal UnitEvaluator this[AbstractUnit other, Component.Operator op]
@@ -221,8 +222,9 @@ namespace clmath
             set => Evaluators[(other.Repr, op)] = value;
         }
 
-        public string Name { get; }
-        public override string Repr { get; }
+        public string Name { get; internal set; }
+        public override string Repr => _repr;
+        internal string _repr;
 
         protected internal override Unit AsUnit(MathContext? ctx = null) => this;
 
@@ -232,9 +234,15 @@ namespace clmath
 
     public sealed class UnitRef : AbstractUnit
     {
-        public UnitRef(string repr) => Repr = repr;
+        private static readonly HashSet<UnitRef> cache = new HashSet<UnitRef>();
+        public UnitRef(string repr)
+        {
+            _repr = repr;
+            cache.Add(this);
+        }
 
-        public override string Repr { get; }
+        public override string Repr => _repr;
+        private string _repr;
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
         {
@@ -252,6 +260,12 @@ namespace clmath
         }
 
         public override string ToString() => Repr;
+
+        internal static void NotifyNameChange(string old, string id)
+        {
+            foreach (var unit in cache.Where(x => x.Repr == old))
+                unit._repr = id;
+        }
     }
 
     public sealed class UnitEvaluator
@@ -359,8 +373,8 @@ namespace clmath
             }
         }
 
-        public static void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) =>
-            inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
+        public static void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) 
+            => inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
         public void Finalize(MathContext ctx)
         {
             foreach (var inputA in values.Values)
@@ -374,7 +388,7 @@ namespace clmath
                     switch (op)
                     {
                         case Component.Operator.Multiply:
-                            if (inputB != null)
+                            if (inputB is {Repr: not ""})
                             {
                                 AddEval(inputB, inputA, output, Component.Operator.Multiply);
                                 AddEval(output, inputA, inputB, Component.Operator.Divide);
@@ -383,7 +397,7 @@ namespace clmath
                             else AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
                             break;
                         case Component.Operator.Divide:
-                            if (inputB != null)
+                            if (inputB is {Repr: not ""})
                             {
                                 AddEval(inputA, output, inputB, Component.Operator.Divide);
                                 AddEval(inputB, output, inputA, Component.Operator.Multiply);
