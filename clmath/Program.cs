@@ -32,6 +32,7 @@ namespace clmath
 
         private static readonly int ConfigVersion;
         private static bool _exiting;
+        private static bool _resetting;
         private static bool _dropAll;
         private static Graph? _graph;
 
@@ -44,8 +45,9 @@ namespace clmath
             { "rng_d", double.NaN }
         };
 
-        public static readonly Stack<(Component func, MathContext ctx)> stash = new();
         public static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
+        private static readonly Stack<(Component func, MathContext ctx)> stash = new();
+        private static readonly MultiEntryTable results = new();
 
         static Program()
         {
@@ -272,6 +274,12 @@ namespace clmath
         {
             while (!_exiting)
             {
+                if (_resetting)
+                {
+                    _resetting = false;
+                    CmdClearTarget(BaseContext, new []{"clear", "all"});
+                }
+                
                 _dropAll = false;
                 Console.Title = $"[{DRG}] clmath";
                 Console.Write("math> ");
@@ -345,6 +353,9 @@ namespace clmath
                             break;
                         case "graph":
                             StartGraph(cmds.Length == 1 ? stash.ToArray() : CreateArgsFuncs(1, cmds));
+                            break;
+                        case "reset":
+                            _resetting = true;
                             break;
                         default:
                             EvalFunc(func);
@@ -436,6 +447,7 @@ namespace clmath
             }
             else
             {
+                var cc = 0;
                 // enter editor mode
                 while (true)
                 {
@@ -459,7 +471,7 @@ namespace clmath
                             else ctx[key] = value;
 
                             if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
-                                PrintResult(func, func.Evaluate(ctx), ctx);
+                                CmdEval(func, ctx, cc++ > 0);
                         }
                         else
                         {
@@ -532,8 +544,11 @@ namespace clmath
                                     stash.Pop();
                                     break;
                                 case "eval":
-                                    CmdEval(func, ctx);
+                                    CmdEval(func, ctx, cc++ > 0);
                                     break;
+                                case "reset":
+                                    _resetting = true;
+                                    return;
                                 default:
                                     Console.WriteLine("Error: Unknown command; type 'help' for a list of commands");
                                     break;
@@ -641,18 +656,18 @@ namespace clmath
             }
         }
 
-        private static void CmdEval(Component func, MathContext ctx)
+        private static void CmdEval(Component func, MathContext ctx, bool amend)
         {
             var missing = FindMissingVariables(func, ctx);
             if (missing.Count > 0)
             {
-                DumpVariables(ctx);
+                DumpVariables(ctx, includeVar: (key) => func.EnumerateVars().Contains(key));
                 Console.WriteLine(
                     $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
             }
             else
             {
-                PrintResult(func, func.Evaluate(ctx), ctx);
+                PrintResult(func, func.Evaluate(ctx), ctx, amend: amend);
             }
         }
 
@@ -1069,20 +1084,31 @@ namespace clmath
                 return;
             switch (cmds[1])
             {
+                case "all":
+                    ctx.ClearVars();
+                    ctx.ClearMem();
+                    stash.Clear();
+                    results.Values.Clear();
+                    Console.WriteLine("Everything cleared");
+                    break;
                 case "vars":
                     ctx.ClearVars();
                     Console.WriteLine("Variables cleared");
-                    break;
-                case "stash":
-                    stash.Clear();
-                    Console.WriteLine("Stash cleared");
                     break;
                 case "mem":
                     ctx.ClearMem();
                     Console.WriteLine("Memory cleared");
                     break;
+                case "stash":
+                    stash.Clear();
+                    Console.WriteLine("Stash cleared");
+                    break;
+                case "results":
+                    results.Values.Clear();
+                    Console.WriteLine("Results cleared");
+                    break;
                 default:
-                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'vars', 'stash' and 'mem'");
+                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'all', 'results', 'vars', 'stash' and 'mem'");
                     break;
             }
         }
@@ -1129,21 +1155,20 @@ namespace clmath
             _graph = new Graph(funcs);
         }
 
-        private static void DumpVariables(this MathContext ctx, TextTable? table = null, bool shouldError = true)
+        private static void DumpVariables(this MathContext ctx, MultiEntryTable.Entry? entry = null, bool shouldError = true, Func<string, bool>? includeVar = null)
         {
-            TextTable.Column term, expr;
-            bool newTable = table == null;
-            if (table == null)
+            includeVar ??= (_) => true;
+            Action<object, object> AddEntryData;
+            TextTable table = null!;
+            if (entry == null)
             {
                 table = new TextTable(true, TextTable.LineMode.Unicode);
-                term = table.AddColumn("Variable");
-                expr = table.AddColumn("Value", true);
+                var colTerm = table.AddColumn("Variable");
+                var colExpr = table.AddColumn("Value", true);
+                AddEntryData = (term, value) => table.AddRow().SetData(colTerm, term).SetData(colExpr, value);
             }
-            else
-            {
-                term = table.Columns[0];
-                expr = table.Columns[1];
-            }
+            else AddEntryData = (term, value) => entry.Values.Add((term, value));
+
             if (!ctx.Vars().Any())
             {
                 if (shouldError)
@@ -1151,27 +1176,21 @@ namespace clmath
                 return;
             }
             foreach (var (key, val) in ctx.Vars())
-            {
-                table.AddRow()
-                    .SetData(term, key)
-                    .SetData(expr, val);
-            }
-            if (newTable) 
+                if (includeVar(key)) 
+                    AddEntryData(key, val);
+            if (table != null) 
                 Console.Write(table);
         }
 
-        private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true)
+        private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true, bool amend = false)
         {
             ctx[0] = result; // push result to mem
-            var table = new TextTable(true, TextTable.LineMode.Unicode);
-            var term = table.AddColumn("Term");
-            var expr = table.AddColumn("Value", true);
-            ctx.DumpVariables(table, shouldError);
-            table.AddSeparator();
-            table.AddRow()
-                .SetData(term, func)
-                .SetData(expr, result);
-            Console.Write(table);
+            var entry = amend ? results.Values[^1] : results.AddEntry();
+            if (amend) entry.Values.Clear();
+            ctx.DumpVariables(entry, shouldError, (key) => func.EnumerateVars().Contains(key));
+            entry.Values.Add((func, result));
+            Console.Clear();
+            Console.Write(results);
         }
 
         internal static double IntoDRG(double value)
@@ -1213,6 +1232,75 @@ namespace clmath
             Component.Operator.Power => Math.Pow(x, y),
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Invalid Operator")
         };
+    }
+
+    internal class MultiEntryTable : TextTable
+    {
+        public readonly List<Entry> Values = new();
+        private readonly Column ColTerm;
+        private readonly Column ColValue;
+
+        public override List<Row> Rows
+        {
+            get
+            {
+                IEnumerable<Row> yield = ArraySegment<Row>.Empty;
+                foreach (var entry in Values)
+                    yield = yield.Concat(entry.Rows).Append(new SeparatorRow { Detail = LineType.Bold });
+                var list = yield.ToList();
+                return list.GetRange(0, list.Count - 1);
+            }
+        }
+
+        public MultiEntryTable() : base(true, LineMode.Unicode)
+        {
+            this.ColTerm = AddColumn("Term");
+            this.ColValue = AddColumn("Value");
+        }
+
+        public Entry AddEntry()
+        {
+            var entry = new Entry(this);
+            Values.Add(entry);
+            return entry;
+        }
+
+        public class Entry
+        {
+            private readonly MultiEntryTable _table;
+            public readonly List<(object term, object value)> Values = new();
+
+            internal Entry(MultiEntryTable table)
+            {
+                _table = table;
+            }
+
+            public IEnumerable<Row> Rows
+            {
+                get
+                {
+                    var rows = new List<Row>();
+                    
+                    for (var i = 0; i < Math.Max(Values.Count - 1, 1); i++)
+                    {
+                        var val = Values[i];
+                        rows.Add(new Row()
+                            .SetData(_table.ColTerm, val.term)
+                            .SetData(_table.ColValue, val.value));
+                    }
+                    if (Values.Count > 1)
+                    {
+                        var val = Values[^1];
+                        rows.Add(new SeparatorRow());
+                        rows.Add(new Row()
+                            .SetData(_table.ColTerm, val.term)
+                            .SetData(_table.ColValue, val.value));
+                    }
+
+                    return rows;
+                }
+            }
+        }
     }
 
     public enum CalcMode : byte
