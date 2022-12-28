@@ -694,6 +694,15 @@ namespace clmath
                     Stack.Clear();
                     _dropAll = true;
                     break;
+                case not null:
+                    if (!Regex.IsMatch(cmd.Target!, "\\d+"))
+                        break;
+                    var n = int.Parse(cmd.Target!);
+                    for (var i = n; i > 0; i--)
+                        if (Current.Root)
+                            break;
+                        else Stack.Pop();
+                    break;
             }
         }
 
