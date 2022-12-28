@@ -252,17 +252,16 @@ namespace clmath
                 Console.Write("math> ");
                 var input = Console.ReadLine()!;
                 var result = Parser
-                    .ParseArguments<HelpCommand, ExitCommand, SetCommand, UnsetCommand, ListCommand, EditCommand,
-                        EnableCommand, DisableCommand, LoadCommand, RenameCommand, DeleteCommand, RestoreCommand,
-                        ClearCommand, ModeCommand, SolveCommand, GraphCommand>(input.Split(" "));
+                    .ParseArguments<HelpCommand, ExitCommand, CopyCommand, SetCommand, UnsetCommand, ListCommand,
+                        EditCommand, LoadCommand, RenameCommand, DeleteCommand, 
+                        RestoreCommand, ClearCommand, ModeCommand, SolveCommand, GraphCommand>(input.Split(" "));
                 result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
                     .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
                     .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
                     .WithParsed(WithExceptionHandler<UnsetCommand>(HandleException, HandleUnset))
                     .WithParsed(WithExceptionHandler<ListCommand>(HandleException, HandleList))
                     .WithParsed(WithExceptionHandler<EditCommand>(HandleException, HandleEdit))
-                    .WithParsed(WithExceptionHandler<EnableCommand>(HandleException, HandleEnable))
-                    .WithParsed(WithExceptionHandler<DisableCommand>(HandleException, HandleDisable))
+                    .WithParsed(WithExceptionHandler<CopyCommand>(HandleException, HandleCopy))
                     .WithParsed(WithExceptionHandler<LoadCommand>(HandleException, HandleLoad))
                     .WithParsed(WithExceptionHandler<RenameCommand>(HandleException, HandleRename))
                     .WithParsed(WithExceptionHandler<DeleteCommand>(HandleException, HandleDelete))
@@ -309,11 +308,12 @@ namespace clmath
                     else
                     {
                         var result = Parser
-                            .ParseArguments<HelpCommand, ExitCommand, DropCommand, ClearCommand, SetCommand,
+                            .ParseArguments<HelpCommand, ExitCommand, CopyCommand, DropCommand, ClearCommand, SetCommand,
                                 UnsetCommand, ListCommand, LoadCommand, SaveCommand, StashCommand, RestoreCommand,
                                 ModeCommand, SolveCommand, GraphCommand, EvalCommand>(input.Split(" "));
                         result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
                             .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
+                            .WithParsed(WithExceptionHandler<CopyCommand>(HandleException, HandleCopy))
                             .WithParsed(WithExceptionHandler<DropCommand>(HandleException, HandleDrop))
                             .WithParsed(WithExceptionHandler<ClearCommand>(HandleException, HandleClear))
                             .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
@@ -604,6 +604,23 @@ namespace clmath
         private static void HandleExit(ExitCommand _)
         {
             _exiting = true;
+        }
+
+        private static void HandleCopy(CopyCommand cmd)
+        { // todo: support for non Windows OS
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT
+                && Environment.OSVersion.Platform != PlatformID.Win32Windows
+                && Environment.OSVersion.Platform != PlatformID.Win32S
+                && Environment.OSVersion.Platform != PlatformID.WinCE)
+                throw new Exception("This command is only available on Windows machines");
+            if (Current.Mem().Count() == 0)
+                throw new Exception("No value in memory");
+            var data = Current[0];
+            var startInfo = new ProcessStartInfo("C:\\Windows\\System32\\cmd.exe")
+                { Arguments = $"/k \"(echo {data}| clip) & exit\"" };
+            var process = new Process() { StartInfo = startInfo };
+            process.Start();
+            process.WaitForExit();
         }
 
         private static void HandleDrop(DropCommand cmd)

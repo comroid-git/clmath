@@ -42,6 +42,12 @@ namespace clmath
         public bool Verbose { get; set; }
     }
 
+    [Verb("copy", HelpText = "Copies the last result into the clipboard (Windows only)")]
+    public class CopyCommand : ICmd
+    {
+        public bool Verbose { get; set; }
+    }
+
 // configuration related
     [Verb("list", HelpText = "List things by category")]
     public class ListCommand : ITargetCmd<ListCommand.TargetType>
