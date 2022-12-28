@@ -290,6 +290,7 @@ namespace clmath
                 // enter editor mode
                 while (!(Current.Root || _exiting || _dropAll))
                 {
+                    func = Current.function;
                     Console.Title = $"[{DRG}] {func}";
                     Console.Write($"{func}> ");
                     var input = Console.ReadLine()!;
@@ -324,7 +325,7 @@ namespace clmath
                             { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
                             { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) },
                             { typeof(EvalCommand), cmd => HandleEval((EvalCommand)cmd) }
-                        });
+                        }, func => Stack.Push(new MathContext(Current, ParseFunc(func))));
                     }
                 }
             }
@@ -681,7 +682,18 @@ namespace clmath
 
         private static void HandleDrop(DropCommand cmd)
         {
-            Stack.Pop();
+            if (Current.Root)
+                throw new Exception("Stack is empty");
+            switch (cmd.Target ?? "one")
+            {
+                case "one":
+                    Stack.Pop();
+                    break;
+                case "all":
+                    Stack.Clear();
+                    _dropAll = true;
+                    break;
+            }
         }
 
         private static void HandleSet(SetCommand cmd)
@@ -787,8 +799,12 @@ namespace clmath
             var ClearVars = Current.ClearVars;
             var ClearMemory = Current.ClearMem;
             var ClearStash = stash.Clear;
-            var ClearStack = Stack.Clear;
             var ClearResults = results.Values.Clear;
+            var ClearStack = () =>
+            {
+                Stack.Clear();
+                Stack.Push(BaseContext);
+            };
             switch (cmd.Target)
             {
                 case ClearCommand.TargetType.vars:
@@ -872,6 +888,8 @@ namespace clmath
 
         private static void HandleStash(StashCommand cmd)
         {
+            if (Current.Root)
+                throw new Exception("Stack is empty");
             stash.Push(Stack.Pop());
         }
 
