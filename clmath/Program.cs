@@ -468,13 +468,6 @@ namespace clmath
             return ctx;
         }
 
-        private static void CheckInvalidArgumentCount(string[] arr, int min)
-        {
-            if (arr.Length < min)
-                throw new ArgumentOutOfRangeException(nameof(arr),
-                    $"Error: Not enough arguments; '{arr[0]}' requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
-        }
-
         public static Component ParseFunc(string f)
         {
             var input = new AntlrInputStream(f);
