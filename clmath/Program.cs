@@ -244,34 +244,34 @@ namespace clmath
                 if (_resetting)
                 {
                     _resetting = false;
-                    HandleClear(new ClearCommand { Target = ClearCommand.TargetType.All });
+                    HandleClear(new ClearCommand { Target = ClearCommand.TargetType.all });
                 }
 
                 _dropAll = false;
                 Console.Title = $"[{DRG}] clmath";
                 Console.Write("math> ");
                 var input = Console.ReadLine()!;
-                var result = Parser
-                    .ParseArguments<HelpCommand, ExitCommand, CopyCommand, SetCommand, UnsetCommand, ListCommand,
-                        EditCommand, LoadCommand, RenameCommand, DeleteCommand, 
-                        RestoreCommand, ClearCommand, ModeCommand, SolveCommand, GraphCommand>(input.Split(" "));
-                result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
-                    .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
-                    .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
-                    .WithParsed(WithExceptionHandler<UnsetCommand>(HandleException, HandleUnset))
-                    .WithParsed(WithExceptionHandler<ListCommand>(HandleException, HandleList))
-                    .WithParsed(WithExceptionHandler<EditCommand>(HandleException, HandleEdit))
-                    .WithParsed(WithExceptionHandler<CopyCommand>(HandleException, HandleCopy))
-                    .WithParsed(WithExceptionHandler<LoadCommand>(HandleException, HandleLoad))
-                    .WithParsed(WithExceptionHandler<RenameCommand>(HandleException, HandleRename))
-                    .WithParsed(WithExceptionHandler<DeleteCommand>(HandleException, HandleDelete))
-                    .WithParsed(WithExceptionHandler<RestoreCommand>(HandleException, HandleRestore))
-                    .WithParsed(WithExceptionHandler<ClearCommand>(HandleException, HandleClear))
-                    .WithParsed(WithExceptionHandler<ModeCommand>(HandleException, HandleMode))
-                    .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
-                    .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
-                    .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException,
-                        _ => EvalMode(new MathContext(Current, ParseFunc(input)))));
+                ParseInput(input, new Dictionary<Type, Action<ICmd>>()
+                    {
+                        { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
+                        { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
+                        { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
+                        { typeof(EditCommand), cmd => HandleEdit((EditCommand)cmd) },
+                        { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
+                        { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
+                        { typeof(RenameCommand), cmd => HandleRename((RenameCommand)cmd) },
+                        { typeof(DeleteCommand), cmd => HandleDelete((DeleteCommand)cmd) },
+                        { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
+                        { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
+                        { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
+                        { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
+                        { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) }
+                    })
+                    .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, errors =>
+                    {
+                        foreach (var error in errors) HandleException(new Exception(error.ToString()));
+                        EvalMode(new MathContext(Current, ParseFunc(input)));
+                    }));
             }
         }
 
@@ -307,33 +307,45 @@ namespace clmath
                     }
                     else
                     {
-                        var result = Parser
-                            .ParseArguments<HelpCommand, ExitCommand, CopyCommand, DropCommand, ClearCommand, SetCommand,
-                                UnsetCommand, ListCommand, LoadCommand, SaveCommand, StashCommand, RestoreCommand,
-                                ModeCommand, SolveCommand, GraphCommand, EvalCommand>(input.Split(" "));
-                        result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
-                            .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
-                            .WithParsed(WithExceptionHandler<CopyCommand>(HandleException, HandleCopy))
-                            .WithParsed(WithExceptionHandler<DropCommand>(HandleException, HandleDrop))
-                            .WithParsed(WithExceptionHandler<ClearCommand>(HandleException, HandleClear))
-                            .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
-                            .WithParsed(WithExceptionHandler<UnsetCommand>(HandleException, HandleUnset))
-                            .WithParsed(WithExceptionHandler<ListCommand>(HandleException, HandleList))
-                            .WithParsed(WithExceptionHandler<LoadCommand>(HandleException, HandleLoad))
-                            .WithParsed(WithExceptionHandler<SaveCommand>(HandleException, HandleSave))
-                            .WithParsed(WithExceptionHandler<StashCommand>(HandleException, HandleStash))
-                            .WithParsed(WithExceptionHandler<RestoreCommand>(HandleException, HandleRestore))
-                            .WithParsed(WithExceptionHandler<ModeCommand>(HandleException, HandleMode))
-                            .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
-                            .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
-                            .WithParsed(WithExceptionHandler<EvalCommand>(HandleException, HandleEval))
-                            .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, _ => { }));
+                        ParseInput(input, new Dictionary<Type, Action<ICmd>>()
+                            {
+                                { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
+                                { typeof(DropCommand), cmd => HandleDrop((DropCommand)cmd) },
+                                { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
+                                { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
+                                { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
+                                { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
+                                { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
+                                { typeof(SaveCommand), cmd => HandleSave((SaveCommand)cmd) },
+                                { typeof(StashCommand), cmd => HandleStash((StashCommand)cmd) },
+                                { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
+                                { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
+                                { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
+                                { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) },
+                                { typeof(EvalCommand), cmd => HandleEval((EvalCommand)cmd) }
+                            })
+                            .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, errors =>
+                            {
+                                foreach (var error in errors) HandleException(new Exception(error.ToString()));
+                            }));
                     }
                 }
             }
         }
 
         #region Utilities
+
+        private static ParserResult<object> ParseInput(string input, Dictionary<Type, Action<ICmd>> bindings)
+        {
+            var types = bindings.Keys.ToArray();
+            var result = Parser.ParseArguments(input.Split(" "), types);
+            result
+                .WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result, types)))
+                .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit));
+            if (bindings.FirstOrDefault((entry) => entry.Key.IsInstanceOfType(result.Value)) is var pair)
+                WithExceptionHandler<ICmd>(HandleException, (cmd) => pair.Value(cmd))((result.Value as ICmd)!);
+            return result;
+        }
 
         private static byte[] Read(Stream s, int len)
         {
@@ -592,13 +604,15 @@ namespace clmath
 
         #region Command Handlers
 
-        private static void ShowHelp<T>(ParserResult<T> result)
+        private static void ShowHelp<T>(ParserResult<T> result, Type[] types)
         {
             var helpText = CommandLine.Text.HelpText.AutoBuild(
                 result, text => text, text => text, maxDisplayWidth: 120);
             helpText.MaximumDisplayWidth = Console.WindowWidth;
             helpText.Heading = $"clmath @ {GetAssemblyVersion<MathContext>()}";
             helpText.Copyright = "comroid";
+            helpText.AddVerbs(types);
+            Console.WriteLine(helpText);
         }
 
         private static void HandleExit(ExitCommand _)
@@ -657,36 +671,40 @@ namespace clmath
             var c = 0;
             switch (cmd.Target)
             {
-                case ListCommand.TargetType.Variables:
+                case ListCommand.TargetType.vars:
                     data = Current.Vars().Select(entry => ((object)entry.Key, (object)entry.Value));
                     break;
-                case ListCommand.TargetType.Functions:
-                    data = Directory.EnumerateFiles(Path.Combine(dir, "*" + FuncExt))
+                case ListCommand.TargetType.func:
+                    data = Directory.EnumerateFiles(dir, '*' + FuncExt)
                         .Select(path => new FileInfo(path).Name)
-                        .Select(name => ((object)name, (object)LoadFunc(name)!));
+                        .Select(name => name.Substring(0, name.IndexOf(FuncExt, StringComparison.Ordinal)))
+                        .Select(name => ((object)name, (object)LoadFunc(name)?.function!));
                     break;
-                case ListCommand.TargetType.Constants:
+                case ListCommand.TargetType.constant:
                     data = constants.Select(entry => ((object)entry.Key, (object)entry.Value));
                     break;
-                case ListCommand.TargetType.Stack:
-                    data = Stack.Select(comp => ((object)++c, (object)comp));
+                case ListCommand.TargetType.stack:
+                    data = Stack.Where(it => !it.Root).Select(ctx => ((object)++c, (object)ctx.function!));
                     break;
-                case ListCommand.TargetType.Memory:
+                case ListCommand.TargetType.mem:
                     c = Current.Mem().Count();
                     data = Current.Mem().Select(comp => ((object)--c, (object)comp));
                     break;
-                case ListCommand.TargetType.Stash:
+                case ListCommand.TargetType.stash:
                     data = stash.Select(comp => ((object)++c, (object)comp));
                     break;
-                case ListCommand.TargetType.Enabled:
+                case ListCommand.TargetType.enabled:
+                    colDataText = "Unit ID";
                     data = Current.GetUnitPackages()
                         .SelectMany(pkg => pkg.values.Values)
                         .Select(unit => ((object)unit.Name, (object)unit));
                     break;
-                case ListCommand.TargetType.UnitPack:
-                    data = unitPackages.Values.Select(pkg => ((object)pkg.Name, (object)pkg));
+                case ListCommand.TargetType.packs:
+                    colDataText = "Unit Count";
+                    data = unitPackages.Values.Select(pkg => ((object)pkg.Name, (object)pkg.values.Count));
                     break;
-                case ListCommand.TargetType.Unit:
+                case ListCommand.TargetType.units:
+                    colDataText = "Unit ID";
                     data = unitPackages.Values
                         .SelectMany(pkg => pkg.values.Values)
                         .Select(unit => ((object)unit.Name, (object)unit));
@@ -702,6 +720,9 @@ namespace clmath
                 table.AddRow()
                     .SetData(colId, id)
                     .SetData(colData, obj);
+            if (table.Rows.Count == 0)
+                Console.WriteLine("Nothing to display");
+            else Console.Write(table);
         }
 
         private static void HandleEdit(EditCommand cmd)
@@ -717,19 +738,19 @@ namespace clmath
             var ClearStack = Stack.Clear;
             switch (cmd.Target)
             {
-                case ClearCommand.TargetType.Variables:
+                case ClearCommand.TargetType.vars:
                     ClearVars();
                     break;
-                case ClearCommand.TargetType.Memory:
+                case ClearCommand.TargetType.mem:
                     ClearMemory();
                     break;
-                case ClearCommand.TargetType.Stash:
+                case ClearCommand.TargetType.stash:
                     ClearStash();
                     break;
-                case ClearCommand.TargetType.Stack:
+                case ClearCommand.TargetType.stack:
                     ClearStack();
                     break;
-                case ClearCommand.TargetType.All:
+                case ClearCommand.TargetType.all:
                     ClearVars();
                     ClearMemory();
                     ClearStash();
@@ -742,7 +763,9 @@ namespace clmath
 
         private static void HandleLoad(LoadCommand cmd)
         {
-            Stack.Push(LoadFunc(cmd.Target)!);
+            var ctx = LoadFunc(cmd.Target)!;
+            Stack.Push(ctx);
+            EvalMode(ctx);
         }
 
         private static void HandleSave(SaveCommand cmd)

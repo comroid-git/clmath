@@ -6,7 +6,7 @@ namespace clmath
 {
     public interface ICmd
     {
-        [Option('v', "verbose", HelpText = "Print verbose information, if applicable")]
+        [Option('v', "verbose", Required = false, Default = false, HelpText = "Print verbose information, if applicable")]
         public bool Verbose { get; set; }
     }
 
@@ -54,15 +54,15 @@ namespace clmath
     {
         public enum TargetType
         {
-            Variables = default,
-            Functions,
-            Constants,
-            Stack,
-            Memory,
-            Stash,
-            Enabled,
-            UnitPack,
-            Unit
+            vars = default,
+            func,
+            constant,
+            stack,
+            mem,
+            stash,
+            enabled,
+            packs,
+            units
         }
 
         public bool Verbose { get; set; }
@@ -96,7 +96,7 @@ namespace clmath
     {
         public enum TargetType
         {
-            Unit
+            unit
         }
 
         public bool Verbose { get; set; }
@@ -158,11 +158,11 @@ namespace clmath
     {
         public enum TargetType
         {
-            Variables = default,
-            Memory,
-            Stash,
-            Stack,
-            All
+            vars = default,
+            mem,
+            stash,
+            stack,
+            all
         }
 
         public bool Verbose { get; set; }
