@@ -563,9 +563,10 @@ namespace clmath
         }
 
         private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true,
-            bool amend = false, bool printOnly = false)
+            bool printOnly = false)
         {
             if (!printOnly) ctx[0] = result; // push result to mem
+            var amend = results.Values.Count > 0 && results.Values[^1].Values[^1].term.ToString() == func.ToString();
             var entry = amend ? results.Values[^1] : results.AddEntry();
             if (!printOnly)
             {
