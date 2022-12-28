@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
 using CommandLine;
+using CommandLine.Text;
 using comroid.csapi.common;
 using static comroid.csapi.common.DebugUtil;
 using Parser = CommandLine.Parser;
@@ -636,14 +637,18 @@ namespace clmath
 
         private static void ShowHelp<T>(ParserResult<T> result, Type[] types, string? verb)
         {
-            var helpText = CommandLine.Text.HelpText.AutoBuild(
-                result, text => text, text => text, maxDisplayWidth: 120);
-            helpText.MaximumDisplayWidth = Console.WindowWidth;
-            helpText.Heading = VersionText;
-            helpText.Copyright = "comroid";
-            helpText.AddDashesToOption = false;
-            helpText.AdditionalNewLineAfterOption = false;
-            helpText.AddEnumValuesToHelpText = true;
+            var helpText = HelpText.AutoBuild(
+                result, helpText =>
+                {
+                    helpText.MaximumDisplayWidth = Console.WindowWidth;
+                    helpText.Heading = VersionText;
+                    helpText.Copyright = "comroid";
+                    helpText.AddDashesToOption = false;
+                    helpText.AdditionalNewLineAfterOption = false;
+                    helpText.AddEnumValuesToHelpText = true;
+                    helpText.AutoVersion = false;
+                    return HelpText.DefaultParsingErrorsHandler(result, helpText);
+                }, e => e, maxDisplayWidth: 120);
             var verbs = verb == null ? types
                 : types.Where(t => t.Name.StartsWith(verb, true, CultureInfo.InvariantCulture));
             helpText.AddOptions(result);
