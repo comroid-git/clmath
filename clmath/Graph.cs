@@ -51,7 +51,7 @@ namespace clmath
             AssemblyDir = new FileInfo(typeof(Graph).Assembly.Location).Directory!;
         }
 
-        public Graph(params (Component fx, MathContext ctx)[] funcs)
+        public Graph(params MathContext[] funcs)
         {
             var fxn = funcs.Length;
             if (fxn > maxFuncs)
@@ -70,8 +70,8 @@ namespace clmath
             x = new Component[fxn];
             for (var i = 0; i < fxn; i++)
             {
-                fx[i] = funcs[i].fx;
-                ctx[i] = new MathContext(funcs[i].ctx);
+                fx[i] = funcs[i].Function;
+                ctx[i] = new MathContext(funcs[i]);
                 var vars = fx[i].GetVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
                 if (vars.Count(s => ctx[i].Vars().All(y => y.Key != s)) > 1)
                 {

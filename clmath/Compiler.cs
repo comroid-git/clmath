@@ -257,7 +257,7 @@ namespace clmath
             List<string> vars = new();
             if (type == Type.Eval)
             {
-                Program.LoadFunc(arg!.ToString()!)?.func.GetVars().ForEach(vars.Add);
+                Program.LoadFunc(arg!.ToString()!)?.function?.GetVars().ForEach(vars.Add);
                 foreach (var arg in args)
                     vars.Add(arg.arg!.ToString()!);
             }
@@ -266,8 +266,11 @@ namespace clmath
             y?.GetVars().ForEach(vars.Add);
             return vars;
         }
-        
-        public List<string> GetVars() => EnumerateVars().Distinct().ToList();
+
+        public List<string> GetVars()
+        {
+            return EnumerateVars().Distinct().ToList();
+        }
 
         public UnitResult Evaluate(MathContext? ctx)
         {
@@ -276,7 +279,7 @@ namespace clmath
             switch (type)
             {
                 case Type.Num:
-                    return new UnitResult((double) arg!);
+                    return new UnitResult((double)arg!);
                 case Type.Var:
                     if (arg is not string name)
                         throw new Exception("Invalid arg: " + arg);
@@ -342,17 +345,25 @@ namespace clmath
                     switch (op)
                     {
                         case Operator.Add:
-                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) + SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit,
+                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) +
+                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Subtract:
-                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) - SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit,
+                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) -
+                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
                             return x!.Multiply(ctx!, y!).Normalize();
                         case Operator.Divide:
                             return x!.Divide(ctx!, y!).Normalize();
                         case Operator.Modulus:
-                            return new UnitResult(x!.Unit, SiPrefix.None.Convert(x.Unit.Prefix, x.Value) % SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit,
+                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) %
+                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Power:
-                            return new UnitResult(x!.Unit, Math.Pow(x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value), y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value))).Normalize();
+                            return new UnitResult(x!.Unit,
+                                Math.Pow(x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value),
+                                    y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value))).Normalize();
                         case null: throw new Exception("invalid state");
                     }
 
@@ -360,19 +371,21 @@ namespace clmath
                 case Type.Eval:
                     if (Program.LoadFunc(arg!.ToString()!) is not { } res)
                         return new UnitResult(SiUnit.None, double.NaN).Normalize();
-                    var subCtx = new MathContext(res.ctx);
+                    var subCtx = new MathContext(res);
                     foreach (var (key, value) in ctx!.Vars())
                         subCtx[key] = value;
                     foreach (var var in args)
                         subCtx[var.arg!.ToString()!] = var.x!;
-                    return res.func.Evaluate(subCtx);
+                    return res.function!.Evaluate(subCtx);
                 case Type.Parentheses:
                     return new UnitResult(x!.Unit, x.Value).Normalize();
                 case Type.Unit:
-                    var unitResult = new UnitResult(arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()), x!.Value);
+                    var unitResult =
+                        new UnitResult(arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()),
+                            x!.Value);
                     if (op == Operator.Modulus)
                         return unitResult.Normalize(SiPrefix.None);
-                    else return unitResult.Normalize();
+                    return unitResult.Normalize();
             }
 
             throw new NotSupportedException(ToString());

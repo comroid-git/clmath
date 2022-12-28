@@ -1,12 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Concurrent;
-using System.ComponentModel.Design.Serialization;
+﻿using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Transactions;
 using Antlr4.Runtime;
 using clmath.Antlr;
+
 // ReSharper disable ArrangeObjectCreationWhenTypeEvident
 
 // ReSharper disable once ArrangeNamespaceBody
@@ -126,7 +123,10 @@ namespace clmath
             return SiPrefix.Normalize(Unit.Unit, SiPrefix.None.Convert(Unit.Prefix, Value), preferredPrefix);
         }
 
-        public double As(SiPrefix? prefix = null) => Normalize(prefix ?? SiPrefix.None).Value;
+        public double As(SiPrefix? prefix = null)
+        {
+            return Normalize(prefix ?? SiPrefix.None).Value;
+        }
 
         public override string ToString()
         {
@@ -138,7 +138,7 @@ namespace clmath
     public abstract class AbstractUnit
     {
         public abstract string Repr { get; }
-        
+
         protected internal abstract Unit AsUnit(MathContext? ctx = null);
 
         private AbstractUnit? FindCommonUnit(AbstractUnit other, MathContext? ctx = null)
@@ -154,11 +154,20 @@ namespace clmath
             };
         }
 
-        public override int GetHashCode() => Repr.GetHashCode();
+        public override int GetHashCode()
+        {
+            return Repr.GetHashCode();
+        }
 
-        public override bool Equals(object? obj) => obj is AbstractUnit other && Repr == other.Repr;
-        
-        public override string ToString() => Repr;
+        public override bool Equals(object? obj)
+        {
+            return obj is AbstractUnit other && Repr == other.Repr;
+        }
+
+        public override string ToString()
+        {
+            return Repr;
+        }
     }
 
     public sealed class SiUnit : AbstractUnit
@@ -193,21 +202,26 @@ namespace clmath
             Unit = unit;
         }
 
+        public override string Repr => Unit.Repr;
+
         public override string ToString()
         {
             return $"{Prefix}{Unit}";
         }
 
-        public override string Repr => Unit.Repr;
-        protected internal override Unit AsUnit(MathContext? ctx = null) => Unit.AsUnit(ctx);
+        protected internal override Unit AsUnit(MathContext? ctx = null)
+        {
+            return Unit.AsUnit(ctx);
+        }
     }
 
     public sealed class Unit : AbstractUnit
     {
-        internal bool Finalized = false;
-        public readonly UnitPackage Package;
         public static readonly Unit None = new(UnitPackage.None, string.Empty, string.Empty);
         private readonly ConcurrentDictionary<(string repr, Component.Operator op), UnitEvaluator> Evaluators = new();
+        public readonly UnitPackage Package;
+        internal string _repr;
+        internal bool Finalized;
 
         internal Unit(UnitPackage package, string name, string repr)
         {
@@ -224,17 +238,24 @@ namespace clmath
 
         public string Name { get; internal set; }
         public override string Repr => _repr;
-        internal string _repr;
 
-        protected internal override Unit AsUnit(MathContext? ctx = null) => this;
+        protected internal override Unit AsUnit(MathContext? ctx = null)
+        {
+            return this;
+        }
 
-        public IEnumerable<(UnitRef other, Component.Operator op, UnitEvaluator eval)> GetEvaluators() => Evaluators
-            .Select((entry) => (new UnitRef(entry.Key.repr), entry.Key.op, entry.Value));
+        public IEnumerable<(UnitRef other, Component.Operator op, UnitEvaluator eval)> GetEvaluators()
+        {
+            return Evaluators
+                .Select(entry => (new UnitRef(entry.Key.repr), entry.Key.op, entry.Value));
+        }
     }
 
     public sealed class UnitRef : AbstractUnit
     {
         private static readonly HashSet<UnitRef> cache = new HashSet<UnitRef>();
+        private string _repr;
+
         public UnitRef(string repr)
         {
             _repr = repr;
@@ -242,7 +263,6 @@ namespace clmath
         }
 
         public override string Repr => _repr;
-        private string _repr;
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
         {
@@ -259,7 +279,10 @@ namespace clmath
             return result;
         }
 
-        public override string ToString() => Repr;
+        public override string ToString()
+        {
+            return Repr;
+        }
 
         internal static void NotifyNameChange(string old, string id)
         {
@@ -270,8 +293,8 @@ namespace clmath
 
     public sealed class UnitEvaluator
     {
-        public readonly AbstractUnit output;
         public readonly Component.Operator? op;
+        public readonly AbstractUnit output;
         public readonly double? overrideY;
 
         internal UnitEvaluator(AbstractUnit output, Component.Operator? op = null, double? overrideY = null)
@@ -281,7 +304,10 @@ namespace clmath
             this.overrideY = overrideY;
         }
 
-        public double Evaluate(double x, double y) => op!.Value.Evaluate(x, overrideY ?? y);
+        public double Evaluate(double x, double y)
+        {
+            return op!.Value.Evaluate(x, overrideY ?? y);
+        }
     }
 
     public sealed class UnitPackage
@@ -298,13 +324,14 @@ namespace clmath
 
         public AbstractUnit Get(string id)
         {
-            return (AbstractUnit?) values!.GetValueOrDefault(id, null) ?? new UnitRef(id);
+            return (AbstractUnit?)values!.GetValueOrDefault(id, null) ?? new UnitRef(id);
         }
 
-        public Unit CreateOrGet(string name, string id) => values.GetOrAdd(id, (_) => new(this, name, id));
+        public Unit CreateOrGet(string name, string id)
+        {
+            return values.GetOrAdd(id, _ => new Unit(this, name, id));
+        }
 
-        internal class UnitLoadException : Exception {}
-        
         public void Load(string file)
         {
             if (!File.Exists(file))
@@ -313,35 +340,38 @@ namespace clmath
             var uName = fName.Substring(0, fName.IndexOf(Program.UnitExt, StringComparison.Ordinal));
             Unit unit = null!;
             using var fs = File.OpenRead(file);
-            int o = 0;
-            byte[] buf = new byte[4];
-            while (o <= 3 && fs.Read(buf, 0, buf.Length) != -1) switch (o++)
-            {
-                case 0:
-                    // reserved 4 bytes
-                    if (buf.Any(b => b != 0))
-                    { // unit file needs migration
-                        values.TryRemove(uName, out _);
-                        throw new UnitLoadException();
-                    }
-                    break;
-                case 1:
-                    // repr len
-                    var len = BitConverter.ToInt32(buf);
-                    buf = new byte[len];
-                    break;
-                case 2:
-                    // repr
-                    unit = CreateOrGet(uName, Encoding.ASCII.GetString(buf));
-                    buf = new byte[1];
-                    break;
-                case 3:
-                    if (buf[0] == '\r' && fs.Read(buf, 0, 1) != 1)
-                        throw new Exception("Invalid End of Line");
-                    if (buf[0] != '\n') 
-                        throw new Exception("Linefeed expected");
-                    break;
-            }
+            var o = 0;
+            var buf = new byte[4];
+            while (o <= 3 && fs.Read(buf, 0, buf.Length) != -1)
+                switch (o++)
+                {
+                    case 0:
+                        // reserved 4 bytes
+                        if (buf.Any(b => b != 0))
+                        {
+                            // unit file needs migration
+                            values.TryRemove(uName, out _);
+                            throw new UnitLoadException();
+                        }
+
+                        break;
+                    case 1:
+                        // repr len
+                        var len = BitConverter.ToInt32(buf);
+                        buf = new byte[len];
+                        break;
+                    case 2:
+                        // repr
+                        unit = CreateOrGet(uName, Encoding.ASCII.GetString(buf));
+                        buf = new byte[1];
+                        break;
+                    case 3:
+                        if (buf[0] == '\r' && fs.Read(buf, 0, 1) != 1)
+                            throw new Exception("Invalid End of Line");
+                        if (buf[0] != '\n')
+                            throw new Exception("Linefeed expected");
+                        break;
+                }
 
             if (unit == null)
                 throw new Exception("Assertion failure");
@@ -354,7 +384,7 @@ namespace clmath
             var ats = new CommonTokenStream(lex);
             var par = new MathParser(ats);
             var file = par.unitFile();
-            
+
             foreach (var equation in new MathCompiler().VisitUnitFile(file))
             {
                 if (equation is not { type: Component.Type.Equation }
@@ -366,16 +396,19 @@ namespace clmath
                 var input = srcIsX ? lhs.y : lhs.x;
                 var other = input?.FindOutputUnit();
                 if (input?.type == Component.Type.Num)
-                    unit[Unit.None, Component.Operator.Multiply] = 
-                        new UnitEvaluator(result, Component.Operator.Multiply, overrideY: (double)input.arg!);
+                    unit[Unit.None, Component.Operator.Multiply] =
+                        new UnitEvaluator(result, Component.Operator.Multiply, (double)input.arg!);
                 else if (other != null && lhs.op is Component.Operator.Multiply or Component.Operator.Divide)
                     unit[other, lhs.op!.Value] = new UnitEvaluator(result, lhs.op);
                 else throw new Exception("Malformed equation: Only Multiply or Divide operators are allowed");
             }
         }
 
-        public static void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null) 
-            => inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
+        public static void AddEval(Unit inputA, Unit inputB, Unit output, Component.Operator op, double? overrideY = null)
+        {
+            inputA[inputB, op] = new UnitEvaluator(output, op, overrideY);
+        }
+
         public void Finalize(MathContext ctx)
         {
             foreach (var inputA in values.Values)
@@ -389,27 +422,36 @@ namespace clmath
                     switch (op)
                     {
                         case Component.Operator.Multiply:
-                            if (inputB is {Repr: not ""})
+                            if (inputB is { Repr: not "" })
                             {
                                 AddEval(inputB, inputA, output, Component.Operator.Multiply);
                                 AddEval(output, inputA, inputB, Component.Operator.Divide);
                                 AddEval(output, inputB, inputA, Component.Operator.Divide);
                             }
-                            else AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
+                            else
+                            {
+                                AddEval(output, Unit.None, inputA, Component.Operator.Divide, eval.overrideY);
+                            }
+
                             break;
                         case Component.Operator.Divide:
-                            if (inputB is {Repr: not ""})
+                            if (inputB is { Repr: not "" })
                             {
                                 AddEval(inputA, output, inputB, Component.Operator.Divide);
                                 AddEval(inputB, output, inputA, Component.Operator.Multiply);
                                 AddEval(output, inputB, inputA, Component.Operator.Multiply);
                             }
-                            else AddEval(output, Unit.None, inputA, Component.Operator.Multiply, eval.overrideY);
+                            else
+                            {
+                                AddEval(output, Unit.None, inputA, Component.Operator.Multiply, eval.overrideY);
+                            }
+
                             break;
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eval.op));
                     }
                 }
+
                 inputA.Finalized = true;
             }
         }
@@ -417,6 +459,10 @@ namespace clmath
         public override string ToString()
         {
             return Name;
+        }
+
+        internal class UnitLoadException : Exception
+        {
         }
     }
 }

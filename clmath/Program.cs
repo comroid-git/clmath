@@ -1,24 +1,27 @@
-﻿using System.Collections;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
+using CommandLine;
 using comroid.csapi.common;
+using static comroid.csapi.common.DebugUtil;
+using Parser = CommandLine.Parser;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
 {
     public static class Program
     {
-        public static readonly Random RNG = new();
-        public static readonly MathContext BaseContext = new(null);
-        public static bool SimplePrint = false;
-        
+        #region Fields
         private const double factorD2R = Math.PI / 180;
         private const double factorD2G = 1.111111111;
+        public static readonly Random RNG = new();
+        public static readonly MathContext BaseContext;
+        public static readonly Stack<MathContext> Stack;
+        public static bool SimplePrint = false;
         private static readonly string FuncExt = ".math";
         private static readonly string ConstExt = ".vars";
         internal static readonly string UnitExt = ".unit";
@@ -31,6 +34,7 @@ namespace clmath
         private static readonly string constantsFile = Path.Combine(dir, "constants" + ConstExt);
         private static readonly string configFile = Path.Combine(dir, "config.bin");
 
+        public static Parser Parser;
         private static readonly int ConfigVersion;
         private static bool _exiting;
         private static bool _resetting;
@@ -47,11 +51,32 @@ namespace clmath
         };
 
         public static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
-        private static readonly Stack<(Component func, MathContext ctx)> stash = new();
+        private static readonly Stack<MathContext> stash = new();
         private static readonly MultiEntryTable results = new();
+
+        private static UnitPackage selectedPkg;
+        private static Unit selectedUnit;
+        public static MathContext Current => Stack.Peek();
+
+        public static CalcMode DRG { get; set; } = CalcMode.Deg;
+        public static bool AutoEval { get; set; } = true;
+        public static Dictionary<string, double> constants { get; private set; } = null!;
+        #endregion
+
+        #region Lifecycle Methods
 
         static Program()
         {
+            BaseContext = new MathContext(null!);
+            Stack = new Stack<MathContext>();
+            Stack.Push(BaseContext);
+            Parser = new Parser(cfg =>
+            {
+                cfg.AutoHelp = true;
+                cfg.AutoVersion = true;
+                cfg.CaseSensitive = false;
+                cfg.ParsingCulture = CultureInfo.InvariantCulture;
+            });
             ConfigVersion = FileVersionInfo.GetVersionInfo(typeof(Program).Assembly.Location).FileMajorPart;
             SetUp();
             if (!Directory.Exists(dir))
@@ -69,11 +94,6 @@ namespace clmath
             LoadConstants();
             LoadUnits(BaseContext);
         }
-
-        public static Dictionary<string, double> constants { get; private set; } = null!;
-
-        public static CalcMode DRG { get; set; } = CalcMode.Deg;
-        public static bool AutoEval { get; set; } = true;
 
         public static void SetUp()
         {
@@ -113,6 +133,7 @@ namespace clmath
                     {
                         package.Load(MigrateUnitFile(unitFile));
                     }
+
                 unitPackages[packageName] = package;
                 package.Finalize(ctx);
                 package.Save();
@@ -120,6 +141,7 @@ namespace clmath
         }
 
         private static readonly string OldDescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
+
         private static string MigrateUnitFile(string unitFile)
         {
             Console.WriteLine("Migrating outdated unit file " + unitFile);
@@ -136,14 +158,14 @@ namespace clmath
             var newFile = Path.Combine(f.DirectoryName!, uName + UnitExt);
             using var fs = File.OpenWrite(newFile);
             // file head
-            fs.Write(new byte[]{0,0,0,0});
+            fs.Write(new byte[] { 0, 0, 0, 0 });
             var buf = Encoding.ASCII.GetBytes(repr);
             fs.Write(BitConverter.GetBytes(buf.Length));
             fs.Write(buf);
             fs.Write(new[] { (byte)'\n' });
-                
+
             // equations
-            foreach (var equation in convert) 
+            foreach (var equation in convert)
                 fs.Write(Encoding.ASCII.GetBytes(equation + '\n'));
             fs.Flush();
             File.Delete(unitFile);
@@ -182,6 +204,137 @@ namespace clmath
             return true;
         }
 
+        private static void Save()
+        {
+            SaveConfig();
+            SaveConstants();
+            foreach (var (_, pkg) in unitPackages)
+                pkg.Save();
+        }
+
+        #endregion
+
+        public static void Main(params string[] args)
+        {
+            Parser.ParseArguments<GraphCommand, SolveCommand>(args)
+                .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
+                .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
+                .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, _ =>
+                {
+                    if (args.Length == 0)
+                    {
+                        StdIoMode();
+                    }
+                    else
+                    {
+                        var arg = string.Join(" ", args);
+                        EvalMode(new MathContext(BaseContext, ParseFunc(File.ReadAllText(arg))));
+                        Console.WriteLine("Press any key to exit...");
+                        Console.ReadLine();
+                    }
+                }));
+            Save();
+            _exiting = false;
+        }
+
+        private static void StdIoMode()
+        {
+            while (!_exiting)
+            {
+                if (_resetting)
+                {
+                    _resetting = false;
+                    HandleClear(new ClearCommand { Target = ClearCommand.TargetType.All });
+                }
+
+                _dropAll = false;
+                Console.Title = $"[{DRG}] clmath";
+                Console.Write("math> ");
+                var input = Console.ReadLine()!;
+                var result = Parser
+                    .ParseArguments<HelpCommand, ExitCommand, SetCommand, UnsetCommand, ListCommand, EditCommand,
+                        EnableCommand, DisableCommand, LoadCommand, RenameCommand, DeleteCommand, RestoreCommand,
+                        ClearCommand, ModeCommand, SolveCommand, GraphCommand>(input.Split(" "));
+                result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
+                    .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
+                    .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
+                    .WithParsed(WithExceptionHandler<UnsetCommand>(HandleException, HandleUnset))
+                    .WithParsed(WithExceptionHandler<ListCommand>(HandleException, HandleList))
+                    .WithParsed(WithExceptionHandler<EditCommand>(HandleException, HandleEdit))
+                    .WithParsed(WithExceptionHandler<EnableCommand>(HandleException, HandleEnable))
+                    .WithParsed(WithExceptionHandler<DisableCommand>(HandleException, HandleDisable))
+                    .WithParsed(WithExceptionHandler<LoadCommand>(HandleException, HandleLoad))
+                    .WithParsed(WithExceptionHandler<RenameCommand>(HandleException, HandleRename))
+                    .WithParsed(WithExceptionHandler<DeleteCommand>(HandleException, HandleDelete))
+                    .WithParsed(WithExceptionHandler<RestoreCommand>(HandleException, HandleRestore))
+                    .WithParsed(WithExceptionHandler<ClearCommand>(HandleException, HandleClear))
+                    .WithParsed(WithExceptionHandler<ModeCommand>(HandleException, HandleMode))
+                    .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
+                    .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
+                    .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException,
+                        _ => EvalMode(new MathContext(Current, ParseFunc(input)))));
+            }
+        }
+
+        private static void EvalMode(MathContext ctx)
+        {
+            var func = ctx.Function;
+            if (func.GetVars().Distinct().All(constants.ContainsKey))
+            {
+                var res = func.Evaluate(new MathContext(BaseContext));
+                PrintResult(func, res, BaseContext, false);
+            }
+            else
+            {
+                var cc = 0;
+                // enter editor mode
+                while (!(Current.Root || _exiting || _dropAll))
+                {
+                    Console.Title = $"[{DRG}] {func}";
+                    Console.Write($"{func}> ");
+                    var input = Console.ReadLine()!;
+                    if (ConvertValueFromString(input) is { } equ)
+                    {
+                        var key = equ.key;
+                        var value = equ.value;
+                        if (value.GetVars().Contains(key))
+                            Console.WriteLine($"Error: Variable {key} cannot use itself");
+                        else if (constants.ContainsKey(key))
+                            Console.WriteLine($"Error: Cannot redefine {key}");
+                        else ctx[key] = value;
+
+                        if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
+                            HandleEval();
+                    }
+                    else
+                    {
+                        var result = Parser
+                            .ParseArguments<HelpCommand, ExitCommand, DropCommand, ClearCommand, SetCommand,
+                                UnsetCommand, ListCommand, LoadCommand, SaveCommand, StashCommand, RestoreCommand,
+                                ModeCommand, SolveCommand, GraphCommand, EvalCommand>(input.Split(" "));
+                        result.WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result)))
+                            .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit))
+                            .WithParsed(WithExceptionHandler<DropCommand>(HandleException, HandleDrop))
+                            .WithParsed(WithExceptionHandler<ClearCommand>(HandleException, HandleClear))
+                            .WithParsed(WithExceptionHandler<SetCommand>(HandleException, HandleSet))
+                            .WithParsed(WithExceptionHandler<UnsetCommand>(HandleException, HandleUnset))
+                            .WithParsed(WithExceptionHandler<ListCommand>(HandleException, HandleList))
+                            .WithParsed(WithExceptionHandler<LoadCommand>(HandleException, HandleLoad))
+                            .WithParsed(WithExceptionHandler<SaveCommand>(HandleException, HandleSave))
+                            .WithParsed(WithExceptionHandler<StashCommand>(HandleException, HandleStash))
+                            .WithParsed(WithExceptionHandler<RestoreCommand>(HandleException, HandleRestore))
+                            .WithParsed(WithExceptionHandler<ModeCommand>(HandleException, HandleMode))
+                            .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
+                            .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
+                            .WithParsed(WithExceptionHandler<EvalCommand>(HandleException, HandleEval))
+                            .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, _ => { }));
+                    }
+                }
+            }
+        }
+
+        #region Utilities
+
         private static byte[] Read(Stream s, int len)
         {
             var buf = new byte[len];
@@ -190,7 +343,8 @@ namespace clmath
             return buf;
         }
 
-        private static string ConvertValuesToString(IEnumerable<KeyValuePair<string, Component>> values, Func<string, bool>? skip = null)
+        private static string ConvertValuesToString(IEnumerable<KeyValuePair<string, Component>> values,
+            Func<string, bool>? skip = null)
         {
             skip ??= _ => false;
             var txt = string.Empty;
@@ -230,167 +384,16 @@ namespace clmath
             return (key, value);
         }
 
-        public static void Main(params string[] args)
-        {
-            if (args.Length == 0)
-            {
-                StdIoMode();
-            }
-            else
-            {
-                if (args[0] == "graph")
-                {
-                    StartGraph(CreateArgsFuncs(1, args));
-                }
-                else if (args[0] == "solve")
-                {
-                    var func = CreateArgsFuncs(3, args)[0];
-                    CmdSolve(new[] { "solve", args[1], args[2] /*, "-v"*/ },
-                        new Component { type = Component.Type.Var, arg = args[2] }, func.fx, func.ctx);
-                }
-                else
-                {
-                    var arg = string.Join(" ", args);
-                    if (File.Exists(arg))
-                        EvalFunc(File.ReadAllText(arg));
-                    else EvalFunc(arg);
-                    Console.WriteLine("Press any key to exit...");
-                    Console.ReadLine();
-                }
-            }
-
-            SaveConfig();
-            _exiting = false;
-        }
-
-        private static string CleanupString(string str)
-        {
-            var leadingSpaces = 0;
-            for (var i = 0; i < str.Length && str[i] == ' '; i++)
-                leadingSpaces++;
-            return str.Substring(leadingSpaces, str.Length - leadingSpaces);
-        }
-
-        private static void StdIoMode()
-        {
-            while (!_exiting)
-            {
-                if (_resetting)
-                {
-                    _resetting = false;
-                    CmdClearTarget(BaseContext, new []{"clear", "all"});
-                }
-                
-                _dropAll = false;
-                Console.Title = $"[{DRG}] clmath";
-                Console.Write("math> ");
-                var func = Console.ReadLine()!;
-                func = CleanupString(func);
-                var cmds = func.Split(" ");
-
-                try
-                {
-                    switch (cmds[0])
-                    {
-                        case "": break;
-                        case "exit": return;
-                        case "help":
-                            Console.WriteLine($"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
-                            Console.WriteLine("Available commands:");
-                            Console.WriteLine("\thelp\t\t\t\tShows this text");
-                            Console.WriteLine("\texit\t\t\t\tCloses the program");
-                            Console.WriteLine("\tset <const>\t\t\tDefines a constant");
-                            Console.WriteLine("\tunset <const>\t\t\tRemoves a constant");
-                            Console.WriteLine("\tlist <target>\t\t\tLists things");
-                            Console.WriteLine("\tunit <verb> [args]\t\tModify Units");
-                            Console.WriteLine("\tenable <target>\t\t\tEnables the specified unit package");
-                            Console.WriteLine("\tdisable <target>\t\tDisables the specified unit package");
-                            Console.WriteLine("\tload <name>\t\t\tLoads function with the given name");
-                            Console.WriteLine("\tmv <n0> <n1>\t\t\tRename function with the given name");
-                            Console.WriteLine("\tdelete <name>\t\t\tDeletes function with the given name");
-                            Console.WriteLine("\trestore <trace>\t\t\tRestores a function from stash");
-                            Console.WriteLine("\tclear <target>\t\t\tClears the desired target");
-                            Console.WriteLine("\tmode <D/R/G>\t\t\tSets the mode to Deg/Rad/Grad");
-                            Console.WriteLine("\tsolve <var> <lhs> <func>\tSolves a function after var");
-                            Console.WriteLine("\tgraph <func..>\t\t\tDisplays function/s in a 2D graph");
-                            Console.WriteLine("\nEnter a function to start evaluating");
-                            break;
-                        case "set":
-                            CmdSet(func, cmds);
-                            break;
-                        case "unset":
-                            CmdUnset(cmds);
-                            break;
-                        case "list":
-                            CmdList(BaseContext, cmds);
-                            break;
-                        case "unit":
-                            CmdUnit(BaseContext, cmds);
-                            break;
-                        case "enable" or "disable":
-                            CmdToggleState(cmds, cmds[0] == "enable");
-                            break;
-                        case "load":
-                            CmdLoad(cmds);
-                            break;
-                        case "mv" or "rename":
-                            CmdMove(cmds);
-                            break;
-                        case "rm" or "delete":
-                            CmdDelete(cmds);
-                            break;
-                        case "restore":
-                            CmdRestore(cmds);
-                            break;
-                        case "clear":
-                            CmdClearTarget(BaseContext, cmds);
-                            break;
-                        case "mode":
-                            CmdMode(cmds);
-                            break;
-                        case "solve":
-                            var f = CreateArgsFuncs(3, cmds)[0];
-                            CmdSolve(cmds, null, f.fx, f.ctx);
-                            break;
-                        case "graph":
-                            StartGraph(cmds.Length == 1 ? stash.ToArray() : CreateArgsFuncs(1, cmds));
-                            break;
-                        case "copy" or "clip":
-                            if (!BaseContext.Mem().Any())
-                                throw new Exception("No variables in memory");
-                            CmdCopy(BaseContext[0].ToString());
-                            break;
-                        case "reset":
-                            _resetting = true;
-                            break;
-                        default:
-                            EvalFunc(func);
-                            break;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Handle(e);
-                }
-            }
-        }
-
-        private static void Handle(Exception e)
-        {
-            Console.WriteLine("Error: " + e.Message);
-            Debug.WriteLine(e);
-        }
-
-        private static (Component fx, MathContext ctx)[] CreateArgsFuncs(int start, params string[] args)
+        private static MathContext[] CreateArgsFuncs(int start, params string[] args)
         {
             return args.ToList()
                 .GetRange(start, args.Length - start)
                 .Select(ParseFunc)
-                .Select(fx => (fx, new MathContext(BaseContext)))
+                .Select(fx => new MathContext(Current, fx))
                 .ToArray();
         }
 
-        internal static (Component func, MathContext ctx)? LoadFunc(string name)
+        internal static MathContext? LoadFunc(string name)
         {
             var path = Path.Combine(dir, name + FuncExt);
             if (!File.Exists(path))
@@ -401,32 +404,28 @@ namespace clmath
 
             var data = File.ReadAllText(path);
             var lnb = data.IndexOf("\n", StringComparison.Ordinal);
+            var func = ParseFunc(lnb == -1 ? data : data.Substring(0, lnb));
             MathContext ctx;
             if (lnb != -1)
             {
                 var vars = ConvertValuesFromString(data.Substring(lnb + 1, data.Length - lnb - 2));
-                ctx = new MathContext(BaseContext);
+                ctx = new MathContext(BaseContext, func);
                 foreach (var (key, value) in vars)
                     ctx[key] = value;
             }
             else
             {
-                ctx = new MathContext(BaseContext);
+                ctx = new MathContext(BaseContext, func);
             }
 
-            return (ParseFunc(lnb == -1 ? data : data.Substring(0, lnb)), ctx);
+            return ctx;
         }
 
-        private static bool IsInvalidArgumentCount(string[] arr, int min)
+        private static void CheckInvalidArgumentCount(string[] arr, int min)
         {
             if (arr.Length < min)
-            {
-                Console.WriteLine(
+                throw new ArgumentOutOfRangeException(nameof(arr),
                     $"Error: Not enough arguments; '{arr[0]}' requires at least {min - 1} argument{(min == 2 ? string.Empty : "s")}");
-                return true;
-            }
-
-            return false;
         }
 
         public static Component ParseFunc(string f)
@@ -436,547 +435,6 @@ namespace clmath
             var tokens = new CommonTokenStream(lexer);
             var parser = new MathParser(tokens);
             return new MathCompiler().Visit(parser.expr());
-        }
-
-        private static void EvalFunc(string f)
-        {
-            var fx = ParseFunc(f);
-            EvalFunc(fx, BaseContext, fx.ToString());
-        }
-
-        private static void EvalFunc(Component func, MathContext ctx, string? f = null)
-        {
-            if (func.GetVars().Distinct().All(constants.ContainsKey))
-            {
-                var res = func.Evaluate(new MathContext(BaseContext));
-                PrintResult(func, res, BaseContext, false);
-            }
-            else
-            {
-                var cc = 0;
-                // enter editor mode
-                while (true)
-                {
-                    if (_exiting || _dropAll)
-                        return;
-                    Console.Title = $"[{DRG}] {func}";
-                    Console.Write($"{func}> ");
-                    var cmd = Console.ReadLine()!;
-                    cmd = CleanupString(cmd);
-
-                    try
-                    {
-                        if (ConvertValueFromString(cmd) is { } result)
-                        {
-                            var key = result.key;
-                            var value = result.value;
-                            if (value.GetVars().Contains(key))
-                                Console.WriteLine($"Error: Variable {key} cannot use itself");
-                            else if (constants.ContainsKey(key))
-                                Console.WriteLine($"Error: Cannot redefine {key}");
-                            else ctx[key] = value;
-
-                            if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
-                                CmdEval(func, ctx, cc++ > 0);
-                        }
-                        else
-                        {
-                            var cmds = cmd.Split(" ");
-                            switch (cmds[0])
-                            {
-                                case "drop":
-                                    _dropAll = cmds[^1] == "all";
-                                    return;
-                                case "exit":
-                                    _exiting = true;
-                                    return;
-                                case "help":
-                                    Console.WriteLine(
-                                        $"clmath v{typeof(Program).Assembly.GetName().Version} by comroid\n");
-                                    Console.WriteLine("Available commands:");
-                                    Console.WriteLine("\thelp\t\t\t\tShows this text");
-                                    Console.WriteLine("\texit\t\t\t\tCloses the program");
-                                    Console.WriteLine("\tdrop\t\t\t\tDrops the current function");
-                                    Console.WriteLine(
-                                        "\tclear [var]\t\t\tClears all variables or just one from the cache");
-                                    Console.WriteLine("\tdump\t\t\t\tPrints all variables in the cache");
-                                    Console.WriteLine("\tlist <target>\t\t\tLists things");
-                                    Console.WriteLine(
-                                        "\tload <func>\t\t\tLoads a function from disk; the current function is kept in a lower execution context");
-                                    Console.WriteLine(
-                                        "\tsave <name>\t\t\tSaves the current function with the given name; append '-y' to store current variables as well");
-                                    Console.WriteLine("\tstash\t\t\t\tStores the function in stash");
-                                    Console.WriteLine(
-                                        "\trestore <id>\t\t\tRestore another function; the current function is kept in a lower execution context");
-                                    Console.WriteLine("\tmode <D/R/G>\t\t\tChanges calculation mode to Deg/Rad/Grad");
-                                    Console.WriteLine(
-                                        "\tsolve <var> <lhs>\t\tSolves the function after the given variable");
-                                    Console.WriteLine("\tgraph\t\t\t\tDisplays the function in a 2D graph");
-                                    Console.WriteLine(
-                                        "\teval\t\t\t\tEvaluates the function, also achieved by just pressing return");
-                                    Console.WriteLine(
-                                        "\nSet variables with an equation (example: 'x = 5' or 'y = x * 2')");
-                                    break;
-                                case "dump":
-                                    DumpVariables(ctx);
-                                    break;
-                                case "list":
-                                    CmdList(ctx, cmds);
-                                    break;
-                                case "load":
-                                    CmdLoad(cmds);
-                                    break;
-                                case "save":
-                                    CmdSave(cmds, f, func, ctx);
-                                    break;
-                                case "clear":
-                                    CmdClearVar(cmds, ctx);
-                                    break;
-                                case "stash":
-                                    stash.Push((func, ctx));
-                                    return;
-                                case "restore":
-                                    CmdRestore(cmds);
-                                    break;
-                                case "mode":
-                                    CmdMode(cmds);
-                                    break;
-                                case "solve":
-                                    CmdSolve(cmds, null, func, ctx);
-                                    break;
-                                case "graph":
-                                    stash.Push((func, ctx));
-                                    StartGraph(stash.ToArray());
-                                    stash.Pop();
-                                    break;
-                                case "eval":
-                                    CmdEval(func, ctx, cc++ > 0);
-                                    break;
-                                case "copy" or "clip":
-                                    if (!BaseContext.Mem().Any())
-                                        throw new Exception("No variables in memory");
-                                    CmdCopy(ctx[0].ToString());
-                                    break;
-                                case "reset":
-                                    _resetting = true;
-                                    return;
-                                default:
-                                    Console.WriteLine("Error: Unknown command; type 'help' for a list of commands");
-                                    break;
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Handle(e);
-                    }
-                }
-            }
-        }
-
-        private static void CmdCopy(string data)
-        { // todo: support for non Windows OS
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT
-                && Environment.OSVersion.Platform != PlatformID.Win32Windows
-                && Environment.OSVersion.Platform != PlatformID.Win32S
-                && Environment.OSVersion.Platform != PlatformID.WinCE)
-                throw new Exception("This command is only available on Windows machines");
-            var startInfo = new ProcessStartInfo("C:\\Windows\\System32\\cmd.exe")
-                { Arguments = $"/k \"(echo {data}| clip) & exit\"" };
-            var process = new Process() { StartInfo = startInfo };
-            process.Start();
-            process.WaitForExit();
-        }
-
-        private static void CmdSolve(string[] cmds, Component? lhs, Component func, MathContext ctx)
-        {
-            if (IsInvalidArgumentCount(cmds, 3))
-                return;
-            lhs ??= new Component { type = Component.Type.Var, arg = cmds[2] };
-            var target = cmds[1];
-            var count = func.GetVars().Count(x => x == target);
-            if (count == 0)
-            {
-                Console.WriteLine($"Error: Variable {target} was not found in function");
-                return;
-            }
-
-            if (count > 1)
-            {
-                Console.WriteLine($"Error: Variable {target} was found more than once");
-                return;
-            }
-
-            var result = new Solver(cmds[^1] == "-v").Solve(func, lhs, target);
-            EvalFunc(result, ctx);
-        }
-
-        private static void CmdSave(string[] cmds, string? f, Component func, MathContext ctx)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-            /*
-            if (cmds[1] == "unit")
-            {
-                // save as unit
-                if (IsInvalidArgumentCount(cmds, 4))
-                    return;
-                if (func.type != Component.Type.Frac
-                    || (func.type == Component.Type.Op &&
-                        func.op is not Component.Operator.Multiply or Component.Operator.Divide)
-                    || func.x?.type != Component.Type.Var || func.y?.type != Component.Type.Var)
-                {
-                    Console.WriteLine($"Error: Cannot convert operation {func} to a unit");
-                    return;
-                }
-
-                var pkg = unitPackages.GetOrAdd(cmds[2], id => new UnitPackage(id));
-                var result = pkg.Get(cmds[3]);
-                var unitA = func.x?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
-                var unitB = func.y?.unitX?.ToUnit(ctx)?.Unit ?? Unit.None;
-
-                if (func.type == Component.Type.Frac ||
-                    (func.type == Component.Type.Op && func.op == Component.Operator.Divide))
-                {
-                    unitA.AddQuotient(unitB, result);
-                    unitB.AddQuotient(unitA, result);
-                }
-                else if (func.type == Component.Type.Op && func.op == Component.Operator.Multiply)
-                {
-                    unitA.AddProduct(unitB, result);
-                    unitB.AddProduct(unitA, result);
-                }
-                else
-                {
-                    throw new Exception("Assertion failure");
-                }
-            }
-            else
-            {
-                var data = f ?? func.ToString();
-                if (cmds.Length > 2 && cmds[2] == "-y")
-                    data += $"\n{ConvertValuesToString(ctx.Vars(), globalConstants.ContainsKey)}";
-                var path = Path.Combine(dir, cmds[1] + FuncExt);
-                File.WriteAllText(path, data);
-                Console.WriteLine($"Function saved as {cmds[1]}");
-            }*/
-        }
-
-        private static void CmdClearVar(string[] cmds, MathContext ctx)
-        {
-            if (cmds.Length > 1)
-            {
-                if (ctx.Vars().All(pair => pair.Key != cmds[1]))
-                {
-                    Console.WriteLine($"Error: Variable {cmds[1]} not found");
-                    return;
-                }
-
-                ctx[cmds[1]] = null;
-                Console.WriteLine($"Variable {cmds[1]} deleted");
-            }
-            else
-            {
-                ctx.ClearVars();
-            }
-        }
-
-        private static void CmdEval(Component func, MathContext ctx, bool amend)
-        {
-            var missing = FindMissingVariables(func, ctx);
-            if (missing.Count > 0)
-            {
-                DumpVariables(ctx, includeVar: (key) => func.EnumerateVars().Contains(key));
-                Console.WriteLine(
-                    $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
-            }
-            else
-            {
-                PrintResult(func, func.Evaluate(ctx), ctx, amend: amend);
-            }
-        }
-
-        private static void CmdSet(string func, string[] cmds)
-        {
-            var setConstN = ConvertValueFromString(func.Substring("set ".Length, func.Length - "set ".Length));
-            if (setConstN is not { } setConst)
-            {
-                Console.WriteLine("Error: Invalid declaration of constant variable; try 'x = 5'");
-                return;
-            }
-
-            if (globalConstants.ContainsKey(setConst.key))
-            {
-                Console.WriteLine($"Error: Cannot redefine {setConst.key}");
-                return;
-            }
-
-            constants[setConst.key] = setConst.value.Evaluate(null).Value; // todo use UnitResult in constants?
-            SaveConstants();
-        }
-
-        private static void CmdUnset(string[] cmds)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-            if (globalConstants.ContainsKey(cmds[1]))
-            {
-                Console.WriteLine($"Error: Cannot unset {cmds[1]}");
-                return;
-            }
-
-            if (!constants.ContainsKey(cmds[1]))
-            {
-                Console.WriteLine($"Error: Unknown constant {cmds[1]}");
-                return;
-            }
-
-            constants.Remove(cmds[1]);
-            SaveConstants();
-        }
-
-        private static void CmdList(MathContext ctx, string[] cmds)
-        {
-            const string options = "'funcs', 'constants', 'mem', 'stash', 'enabled', 'packs' and 'units <pack>'";
-            if (cmds.Length == 1)
-            {
-                Console.WriteLine("Error: Listing target unspecified; options are " + options);
-                return;
-            }
-
-            switch (cmds[1])
-            {
-                case "funcs" or "fx":
-                    var funcs = Directory.EnumerateFiles(dir, "*.math").Select(p => new FileInfo(p)).ToArray();
-                    if (funcs.Length == 0)
-                    {
-                        Console.WriteLine("No saved functions");
-                        break;
-                    }
-
-                    Console.WriteLine("Available functions:");
-                    foreach (var file in funcs)
-                        Console.WriteLine(
-                            $"\t- {file.Name.Substring(0, file.Name.Length - FuncExt.Length)}");
-
-                    break;
-                case "constants" or "const":
-                    if (constants.Count == 0)
-                    {
-                        Console.WriteLine("No available constants");
-                        break;
-                    }
-
-                    Console.WriteLine("Available constants:");
-                    foreach (var (key, value) in constants.Where(c => !double.IsNaN(c.Value)))
-                        Console.WriteLine($"\t{key}\t= {value}");
-                    Console.WriteLine("Available semiconstants:");
-                    Console.WriteLine("\tmem\t= Previous computation result");
-                    Console.WriteLine("\trng_i\t= Random integer");
-                    Console.WriteLine("\trng_d\t= Random decimal");
-
-                    break;
-                case "mem":
-                    if (!ctx.Mem().Any())
-                    {
-                        Console.WriteLine("No values in memory");
-                        break;
-                    }
-
-                    Console.WriteLine("Variables in Memory:");
-                    var i = 0;
-                    foreach (var value in ctx.Mem()) 
-                        Console.WriteLine($"\tmem[{i++}]\t= {value}");
-
-                    break;
-                case "stash":
-                    if (stash.Count == 0)
-                    {
-                        Console.WriteLine("No functions in stash");
-                        break;
-                    }
-
-                    Console.WriteLine("Stashed Functions:");
-                    var i0 = 0;
-                    foreach (var (fx, ctx0) in stash)
-                    {
-                        Console.WriteLine($"\tstash[{i0++}]\t= {fx}");
-                        ctx0.DumpVariables(shouldError: false);
-                    }
-
-                    break;
-                case "enabled":
-                    if (BaseContext.EnabledUnitPacks.Count == 0)
-                    {
-                        Console.WriteLine("No unit packs are enabled");
-                        break;
-                    }
-
-                    Console.WriteLine("Enabled unit packs:");
-                    foreach (var pack in BaseContext.EnabledUnitPacks)
-                        Console.WriteLine($"\t- {pack}");
-                    break;
-                case "packs":
-                    var directories = Directory.GetDirectories(dir, $"*{UnitPackExt}");
-                    if (directories.Length == 0)
-                    {
-                        Console.WriteLine("No unit packages defined");
-                        break;
-                    }
-
-                    Console.WriteLine("Available unit packages:");
-                    foreach (var pack in directories)
-                    {
-                        var packName = new DirectoryInfo(pack).Name.StripExtension(UnitPackExt);
-                        Console.WriteLine($"\t- {packName}");
-                    }
-
-                    break;
-                case "units":
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        break;
-                    if (!unitPackages.ContainsKey(cmds[2]))
-                    {
-                        Console.WriteLine($"Error: Unit pack with name {cmds[2]} was not found");
-                        break;
-                    }
-
-                    var package = unitPackages[cmds[2]];
-                    if (package.values.IsEmpty)
-                    {
-                        Console.WriteLine("No units loaded");
-                        break;
-                    }
-
-                    Console.WriteLine($"Units in package '{package.Name}':");
-                    foreach (var unit in package.values.Values)
-                    {
-                        Console.WriteLine($"\t{unit.Name}");
-                        foreach (var (other, op, eval) in unit.GetEvaluators())
-                            Console.WriteLine($"{unit}{eval.op switch {
-                                Component.Operator.Multiply => "*",
-                                Component.Operator.Divide => "/",
-                                _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString()
-                                ?? other.Repr} = {eval.output}");
-                    }
-
-                    break;
-                default:
-                    Console.WriteLine(
-                        $"Error: Unknown listing target '{cmds[1]}';  options are " + options);
-                    break;
-            }
-        }
-
-        private static UnitPackage selectedPkg;
-        private static Unit selectedUnit;
-        private static void CmdUnit(MathContext ctx, string[] cmds)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-
-            void Selection(int m, string? detail = null)
-            {
-                if (m >= 0 && selectedPkg == null)
-                    throw new Exception("No unit pack selected" + (detail == null ? string.Empty : "; " + detail));
-                if (m >= 1 && selectedUnit == null)
-                    throw new Exception("No unit selected" + (detail == null ? string.Empty : "; " + detail));
-            }
-
-            var table = new TextTable(true, TextTable.LineMode.Unicode);
-            switch (cmds[1])
-            {
-                case "list"/* */:
-                    Selection(0);
-                    var unitName = table.AddColumn("Unit");
-                    var unitRepr = table.AddColumn("ID");
-                    foreach (var unit in selectedPkg.values.Values)
-                        table.AddRow()
-                            .SetData(unitName, unit.Name)
-                            .SetData(unitRepr, unit.Repr);
-                    Console.Write(table);
-                    break;
-                case "sel"/* <name> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    selectedUnit = selectedPkg.values.GetValueOrDefault(cmds[2])
-                                   ?? selectedPkg.values.Values.FirstOrDefault(x => x.Name == cmds[2])!;
-                    Selection(1, "unknown unit: " + cmds[2]);
-                    break;
-                case "add"/* <name> <repr> */:
-                    if (IsInvalidArgumentCount(cmds, 4))
-                        return;
-                    Selection(0);
-                    selectedPkg.values[cmds[3]] = selectedUnit = new Unit(selectedPkg, cmds[2], cmds[3]);
-                    Selection(1, "unable to add unit: " + cmds[2]);
-                    break;
-                case "rename"/* <new_name> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    Selection(1);
-                    selectedUnit.Name = cmds[2];
-                    File.Move(Path.Combine(dir, selectedPkg.Name + UnitPackExt, selectedUnit.Name + UnitExt),
-                        Path.Combine(dir, selectedPkg.Name + UnitPackExt, cmds[2] + UnitExt));
-                    break;
-                case "id"/* <new_id> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    Selection(1);
-                    if (selectedPkg.values.Values.Any(x => x.Repr == cmds[2]))
-                        throw new Exception("ID already taken: " + cmds[2]);
-                    var old = selectedUnit.Repr;
-                    selectedPkg.values[selectedUnit._repr = cmds[2]] = selectedPkg.values[old];
-                    selectedPkg.values.Remove(old, out _);
-                    UnitRef.NotifyNameChange(old, selectedUnit.Repr);
-                    break;
-                case "del"/* */:
-                    Selection(1);
-                    File.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt, selectedUnit.Name + UnitExt));
-                    selectedPkg.values.Remove(selectedUnit.Repr, out _);
-                    selectedUnit = null!;
-                    break;
-                case "addequ"/* <equation> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    Selection(1);
-                    selectedPkg.ParseEquations(new AntlrInputStream(string.Join(" ", cmds[2..])), selectedUnit);
-                    selectedPkg.Finalize(ctx);
-                    break;
-                case "listpkg"/* */:
-                    var pkgName = table.AddColumn("Name");
-                    var unitCount = table.AddColumn("Units");
-                    foreach (var (name, pkg) in unitPackages)
-                        table.AddRow()
-                            .SetData(pkgName, name)
-                            .SetData(unitCount, pkg.values.Count);
-                    Console.Write(table);
-                    break;
-                case "selpkg"/* <name> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    selectedUnit = null!;
-                    selectedPkg = unitPackages.GetValueOrDefault(cmds[2])!;
-                    Selection(0, "unknown package: " + cmds[2]);
-                    break;
-                case "addpkg"/* <name> */:
-                    if (IsInvalidArgumentCount(cmds, 3))
-                        return;
-                    selectedUnit = null!;
-                    selectedPkg = unitPackages[cmds[2]] = new UnitPackage(cmds[2]);
-                    Selection(0, "failed to create package: " + cmds[2]);
-                    break;
-                case "delpkg"/* */:
-                    Selection(0);
-                    unitPackages.Remove(selectedPkg.Name, out _);
-                    Directory.Delete(Path.Combine(dir, selectedPkg.Name + UnitPackExt));
-                    selectedPkg = null!;
-                    selectedUnit = null!;
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(cmds), "Invalid arguments");
-            }
-            selectedPkg?.Save();
-            Console.WriteLine("OK");
         }
 
         private static void Save(this UnitPackage pkg)
@@ -991,173 +449,24 @@ namespace clmath
             var path = Path.Combine(dir, unit.Package.Name + UnitPackExt, unit.Name + UnitExt);
             using var fs = File.OpenWrite(path);
             // file head
-            fs.Write(new byte[]{0,0,0,0});
+            fs.Write(new byte[] { 0, 0, 0, 0 });
             var buf = Encoding.ASCII.GetBytes(unit.Repr);
             fs.Write(BitConverter.GetBytes(buf.Length));
             fs.Write(buf);
             fs.Write(new[] { (byte)'\n' });
-                
+
             // equations
-            string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval) =>
-                $"{unit.Repr}{eval.op switch {
+            string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval)
+            {
+                return $"{unit.Repr}{eval.op switch {
                     Component.Operator.Multiply => '*',
                     Component.Operator.Divide => '/',
                     _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr};";
-            foreach (var (other, _, eval) in unit.GetEvaluators()) 
+            }
+
+            foreach (var (other, _, eval) in unit.GetEvaluators())
                 fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
             fs.Flush();
-        }
-
-        private static void CmdToggleState(string[] cmds, bool newState)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-            var desiredPack = cmds[1];
-            if (!unitPackages.ContainsKey(desiredPack))
-            {
-                Console.WriteLine($"Unit pack {desiredPack} does not exist");
-                return;
-            }
-
-            if (newState == BaseContext.EnabledUnitPacks.Contains(desiredPack))
-            {
-                Console.WriteLine($"Unit pack {desiredPack} is already " + (newState ? "enabled" : "disabled"));
-                return;
-            }
-
-            if (newState)
-                BaseContext.EnabledUnitPacks.Add(desiredPack);
-            else BaseContext.EnabledUnitPacks.Remove(desiredPack);
-            Console.WriteLine($"Unit pack {desiredPack} now " + (newState ? "enabled" : "disabled"));
-        }
-
-        private static void CmdLoad(string[] cmds)
-        {
-            if (!IsInvalidArgumentCount(cmds, 2))
-            {
-                var load = LoadFunc(cmds[1]);
-                if (load is { } res)
-                    EvalFunc(res.func, ctx: res.ctx);
-            }
-        }
-
-        private static void CmdMove(string[] cmds)
-        {
-            if (IsInvalidArgumentCount(cmds, 3))
-                return;
-            var path1 = Path.Combine(dir, cmds[1] + FuncExt);
-            var path2 = Path.Combine(dir, cmds[2] + FuncExt);
-            if (!File.Exists(path1))
-                Console.WriteLine($"Function with name {cmds[1]} not found");
-            else File.Move(path1, path2);
-        }
-
-        private static void CmdDelete(string[] cmds)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-            var path0 = Path.Combine(dir, cmds[1] + FuncExt);
-            if (File.Exists(path0))
-            {
-                File.Delete(path0);
-                Console.WriteLine($"Function with name {cmds[1]} deleted");
-            }
-            else
-            {
-                Console.WriteLine($"Function with name {cmds[1]} not found");
-            }
-        }
-
-        private static void CmdRestore(string[] cmds)
-        {
-            (Component func, MathContext ctx) entry;
-            if (cmds.Length == 1)
-            {
-                entry = stash.Pop();
-            }
-            else
-            {
-                if (Regex.Match(cmds[1], "\\d+") is { Success: true })
-                {
-                    var index = int.Parse(cmds[1]);
-                    if (index > stash.Count)
-                    {
-                        Console.WriteLine($"Error: Backtrace index {index} too large");
-                        return;
-                    }
-
-                    entry = stash.ToArray()[index];
-                    var bak = stash.ToList();
-                    bak.Remove(entry);
-                    stash.Clear();
-                    bak.Reverse();
-                    bak.ForEach(stash.Push);
-                }
-                else
-                {
-                    Console.WriteLine($"Error: Invalid backtrace {cmds[1]}");
-                    return;
-                }
-            }
-
-            EvalFunc(entry.func, ctx: entry.ctx);
-        }
-
-        private static void CmdClearTarget(MathContext ctx, string[] cmds)
-        {
-            if (IsInvalidArgumentCount(cmds, 2))
-                return;
-            switch (cmds[1])
-            {
-                case "all":
-                    ctx.ClearVars();
-                    ctx.ClearMem();
-                    stash.Clear();
-                    results.Values.Clear();
-                    Console.WriteLine("Everything cleared");
-                    break;
-                case "vars":
-                    ctx.ClearVars();
-                    Console.WriteLine("Variables cleared");
-                    break;
-                case "mem":
-                    ctx.ClearMem();
-                    Console.WriteLine("Memory cleared");
-                    break;
-                case "stash":
-                    stash.Clear();
-                    Console.WriteLine("Stash cleared");
-                    break;
-                case "results":
-                    results.Values.Clear();
-                    Console.WriteLine("Results cleared");
-                    break;
-                default:
-                    Console.WriteLine($"Error: Invalid clear target '{cmds[1]}'; options are 'all', 'results', 'vars', 'stash' and 'mem'");
-                    break;
-            }
-        }
-
-        private static void CmdMode(string[] cmds)
-        {
-            if (cmds.Length > 1)
-                switch (cmds[1].ToLower())
-                {
-                    case "d" or "deg" or "degree":
-                        DRG = CalcMode.Deg;
-                        break;
-                    case "r" or "rad" or "radians":
-                        DRG = CalcMode.Rad;
-                        break;
-                    case "g" or "grad" or "grade":
-                        DRG = CalcMode.Grad;
-                        break;
-                    default:
-                        Console.WriteLine($"Error: Invalid calculation mode '{cmds[1]}'");
-                        break;
-                }
-
-            Console.WriteLine($"Calculation mode is {DRG}");
         }
 
         private static List<string> FindMissingVariables(Component func, MathContext ctx)
@@ -1174,15 +483,16 @@ namespace clmath
             return missing;
         }
 
-        private static void StartGraph(params (Component fx, MathContext ctx)[] funcs)
+        private static void StartGraph(params MathContext[] funcs)
         {
             _graph?.Dispose();
             _graph = new Graph(funcs);
         }
 
-        private static void DumpVariables(this MathContext ctx, MultiEntryTable.Entry? entry = null, bool shouldError = true, Func<string, bool>? includeVar = null)
+        private static void DumpVariables(this MathContext ctx, MultiEntryTable.Entry? entry = null,
+            bool shouldError = true, Func<string, bool>? includeVar = null)
         {
-            includeVar ??= (_) => true;
+            includeVar ??= _ => true;
             Action<object, object> AddEntryData;
             TextTable table = null!;
             if (entry == null)
@@ -1192,7 +502,10 @@ namespace clmath
                 var colExpr = table.AddColumn("Value", true);
                 AddEntryData = (term, value) => table.AddRow().SetData(colTerm, term).SetData(colExpr, value);
             }
-            else AddEntryData = (term, value) => entry.Values.Add((term, value));
+            else
+            {
+                AddEntryData = (term, value) => entry.Values.Add((term, value));
+            }
 
             if (!ctx.Vars().Any())
             {
@@ -1200,22 +513,31 @@ namespace clmath
                     Console.WriteLine("Error: No variables are set");
                 return;
             }
+
             foreach (var (key, val) in ctx.Vars())
-                if (includeVar(key)) 
+                if (includeVar(key))
                     AddEntryData(key, val);
-            if (table != null != !SimplePrint) 
+            if (table != null != !SimplePrint)
                 Console.Write(table);
         }
 
-        private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true, bool amend = false)
+        private static void PrintResult(Component func, UnitResult result, MathContext ctx, bool shouldError = true,
+            bool amend = false, bool printOnly = false)
         {
-            ctx[0] = result; // push result to mem
+            if (!printOnly) ctx[0] = result; // push result to mem
             var entry = amend ? results.Values[^1] : results.AddEntry();
-            if (amend) entry.Values.Clear();
-            ctx.DumpVariables(entry, shouldError, (key) => func.EnumerateVars().Contains(key));
-            entry.Values.Add((func, result));
+            if (!printOnly)
+            {
+                if (amend) entry.Values.Clear();
+                ctx.DumpVariables(entry, shouldError, key => func.EnumerateVars().Contains(key));
+                entry.Values.Add((func, result));
+            }
+
             if (SimplePrint)
-                Console.WriteLine($"\t{func}\t= {result}");
+            {
+                if (!printOnly)
+                    Console.WriteLine($"\t{func}\t= {result}");
+            }
             else
             {
                 Console.Clear();
@@ -1252,23 +574,284 @@ namespace clmath
             return str;
         }
 
-        internal static double Evaluate(this Component.Operator op, double x, double y) => op switch
+        internal static double Evaluate(this Component.Operator op, double x, double y)
         {
-            Component.Operator.Add => x + y,
-            Component.Operator.Subtract => x - y,
-            Component.Operator.Multiply => x * y,
-            Component.Operator.Divide => x / y,
-            Component.Operator.Modulus => x % y,
-            Component.Operator.Power => Math.Pow(x, y),
-            _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Invalid Operator")
-        };
+            return op switch
+            {
+                Component.Operator.Add => x + y,
+                Component.Operator.Subtract => x - y,
+                Component.Operator.Multiply => x * y,
+                Component.Operator.Divide => x / y,
+                Component.Operator.Modulus => x % y,
+                Component.Operator.Power => Math.Pow(x, y),
+                _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Invalid Operator")
+            };
+        }
+
+        #endregion
+
+        #region Command Handlers
+
+        private static void ShowHelp<T>(ParserResult<T> result)
+        {
+            var helpText = CommandLine.Text.HelpText.AutoBuild(
+                result, text => text, text => text, maxDisplayWidth: 120);
+            helpText.MaximumDisplayWidth = Console.WindowWidth;
+            helpText.Heading = $"clmath @ {GetAssemblyVersion<MathContext>()}";
+            helpText.Copyright = "comroid";
+        }
+
+        private static void HandleExit(ExitCommand _)
+        {
+            _exiting = true;
+        }
+
+        private static void HandleDrop(DropCommand cmd)
+        {
+            Stack.Pop();
+        }
+
+        private static void HandleSet(SetCommand cmd)
+        {
+            var name = cmd.Variable;
+            if (globalConstants.ContainsKey(name))
+                throw new Exception("Cannot modify constant: " + name);
+            constants[name] = double.Parse(cmd.Value);
+            SaveConstants();
+            Console.WriteLine($"Constant {name} was set");
+        }
+
+        private static void HandleUnset(UnsetCommand cmd)
+        {
+            var name = cmd.Variable;
+            if (globalConstants.ContainsKey(name))
+                throw new Exception("Cannot remove constant: " + name);
+            if (!constants.Remove(name))
+                throw new Exception("Could not remove constant: " + name);
+            SaveConstants();
+            Console.WriteLine($"Constant {name} was unset");
+        }
+
+        private static void HandleList(ListCommand cmd)
+        {
+            var table = new TextTable(lineMode: TextTable.LineMode.Unicode);
+            string colIdText = "Name", colDataText = "Value";
+            IEnumerable<(object id, object obj)> data;
+            var c = 0;
+            switch (cmd.Target)
+            {
+                case ListCommand.TargetType.Variables:
+                    data = Current.Vars().Select(entry => ((object)entry.Key, (object)entry.Value));
+                    break;
+                case ListCommand.TargetType.Functions:
+                    data = Directory.EnumerateFiles(Path.Combine(dir, "*" + FuncExt))
+                        .Select(path => new FileInfo(path).Name)
+                        .Select(name => ((object)name, (object)LoadFunc(name)!));
+                    break;
+                case ListCommand.TargetType.Constants:
+                    data = constants.Select(entry => ((object)entry.Key, (object)entry.Value));
+                    break;
+                case ListCommand.TargetType.Stack:
+                    data = Stack.Select(comp => ((object)++c, (object)comp));
+                    break;
+                case ListCommand.TargetType.Memory:
+                    c = Current.Mem().Count();
+                    data = Current.Mem().Select(comp => ((object)--c, (object)comp));
+                    break;
+                case ListCommand.TargetType.Stash:
+                    data = stash.Select(comp => ((object)++c, (object)comp));
+                    break;
+                case ListCommand.TargetType.Enabled:
+                    data = Current.GetUnitPackages()
+                        .SelectMany(pkg => pkg.values.Values)
+                        .Select(unit => ((object)unit.Name, (object)unit));
+                    break;
+                case ListCommand.TargetType.UnitPack:
+                    data = unitPackages.Values.Select(pkg => ((object)pkg.Name, (object)pkg));
+                    break;
+                case ListCommand.TargetType.Unit:
+                    data = unitPackages.Values
+                        .SelectMany(pkg => pkg.values.Values)
+                        .Select(unit => ((object)unit.Name, (object)unit));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown list Target");
+            }
+
+            var colId = table.AddColumn(colIdText);
+            var colData = table.AddColumn(colDataText);
+
+            foreach (var (id, obj) in data)
+                table.AddRow()
+                    .SetData(colId, id)
+                    .SetData(colData, obj);
+        }
+
+        private static void HandleEdit(EditCommand cmd)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void HandleClear(ClearCommand cmd)
+        {
+            var ClearVars = Current.ClearVars;
+            var ClearMemory = Current.ClearMem;
+            var ClearStash = stash.Clear;
+            var ClearStack = Stack.Clear;
+            switch (cmd.Target)
+            {
+                case ClearCommand.TargetType.Variables:
+                    ClearVars();
+                    break;
+                case ClearCommand.TargetType.Memory:
+                    ClearMemory();
+                    break;
+                case ClearCommand.TargetType.Stash:
+                    ClearStash();
+                    break;
+                case ClearCommand.TargetType.Stack:
+                    ClearStack();
+                    break;
+                case ClearCommand.TargetType.All:
+                    ClearVars();
+                    ClearMemory();
+                    ClearStash();
+                    ClearStack();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown clear Target");
+            }
+        }
+
+        private static void HandleLoad(LoadCommand cmd)
+        {
+            Stack.Push(LoadFunc(cmd.Target)!);
+        }
+
+        private static void HandleSave(SaveCommand cmd)
+        {
+            // save function to file
+            var name = cmd.Target;
+            var func = Current.Function;
+            var data = func.ToString();
+            if (cmd.Detailed)
+                data += $"\n{ConvertValuesToString(Current.Vars(), globalConstants.ContainsKey)}";
+            var path = Path.Combine(dir, name + FuncExt);
+            File.WriteAllText(path, data);
+            Console.WriteLine($"Function saved as {name}");
+        }
+
+        private static void HandleRename(RenameCommand cmd)
+        {
+            var name = cmd.Target;
+            var dest = cmd.Value;
+            File.Move(Path.Combine(dir, name + FuncExt), Path.Combine(dir, dest + FuncExt));
+            Console.WriteLine($"Function {name} renamed to {dest}");
+        }
+
+        private static void HandleDelete(DeleteCommand cmd)
+        {
+            var name = cmd.Target;
+            File.Delete(Path.Combine(dir, name + FuncExt));
+            Console.WriteLine($"Function {name} deleted");
+        }
+
+        private static void HandleEnable(EnableCommand cmd)
+        {
+            if (Current.EnabledUnitPacks.Add(cmd.Target))
+                Console.WriteLine("Enabled unit pack " + cmd.Target);
+        }
+
+        private static void HandleDisable(DisableCommand cmd)
+        {
+            if (Current.EnabledUnitPacks.Remove(cmd.Target))
+                Console.WriteLine("Disabled unit pack " + cmd.Target);
+        }
+
+        private static void HandleMode(ModeCommand cmd)
+        {
+            DRG = cmd.Target;
+        }
+
+        private static void HandleStash(StashCommand cmd)
+        {
+            stash.Push(Stack.Pop());
+        }
+
+        private static void HandleRestore(RestoreCommand cmd)
+        {
+            Stack.Push(stash.Pop());
+        }
+
+        private static void HandleEval(EvalCommand? _ = null)
+        {
+            var ctx = Current;
+            var func = ctx.Function;
+            var missing = FindMissingVariables(func, ctx);
+            if (missing.Count > 0)
+            {
+                DumpVariables(ctx, includeVar: key => func.EnumerateVars().Contains(key));
+                Console.WriteLine(
+                    $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
+            }
+            else
+            {
+                PrintResult(func, func.Evaluate(ctx), ctx);
+            }
+        }
+
+        private static void HandleSolve(SolveCommand cmd)
+        {
+            var ctx = cmd.Function == null ? Current : CreateArgsFuncs(0, cmd.Function)[0];
+            var lhs = new Component { type = Component.Type.Var, arg = cmd.LHS };
+            var target = cmd.For;
+            var count = ctx.Function.GetVars().Count(x => x == target);
+            if (count == 0)
+            {
+                Console.WriteLine($"Error: Variable {target} was not found in function");
+                return;
+            }
+
+            if (count > 1)
+            {
+                Console.WriteLine($"Error: Variable {target} was found more than once");
+                return;
+            }
+
+            var result = new Solver(cmd.Verbose).Solve(ctx.Function, lhs, target);
+            EvalMode(new MathContext(ctx, result));
+        }
+
+        private static void HandleGraph(GraphCommand cmd)
+        {
+            StartGraph(CreateArgsFuncs(0,
+                new[]
+                {
+                    cmd.Function, cmd.Function2, cmd.Function3, cmd.Function4,
+                    cmd.Function5, cmd.Function6, cmd.Function7
+                }.Where(it => it != null).ToArray()));
+        }
+
+        private static void HandleException(Exception e)
+        {
+            Console.WriteLine("Error: " + (string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message));
+            Debug.WriteLine(e);
+        }
+
+        #endregion
     }
 
     internal class MultiEntryTable : TextTable
     {
-        public readonly List<Entry> Values = new();
         private readonly Column ColTerm;
         private readonly Column ColValue;
+        public readonly List<Entry> Values = new();
+
+        public MultiEntryTable() : base(true, LineMode.Unicode)
+        {
+            ColTerm = AddColumn("Term");
+            ColValue = AddColumn("Value");
+        }
 
         public override List<Row> Rows
         {
@@ -1280,12 +863,6 @@ namespace clmath
                 var list = yield.ToList();
                 return list.GetRange(0, list.Count - 1);
             }
-        }
-
-        public MultiEntryTable() : base(true, LineMode.Unicode)
-        {
-            this.ColTerm = AddColumn("Term");
-            this.ColValue = AddColumn("Value");
         }
 
         public Entry AddEntry()
@@ -1310,7 +887,7 @@ namespace clmath
                 get
                 {
                     var rows = new List<Row>();
-                    
+
                     for (var i = 0; i < Math.Max(Values.Count - 1, 1); i++)
                     {
                         var val = Values[i];
@@ -1318,6 +895,7 @@ namespace clmath
                             .SetData(_table.ColTerm, val.term)
                             .SetData(_table.ColValue, val.value));
                     }
+
                     if (Values.Count > 1)
                     {
                         var val = Values[^1];
@@ -1342,16 +920,22 @@ namespace clmath
 
     public sealed class MathContext
     {
-        private readonly MathContext? _parent;
-        private readonly Dictionary<string, Component> var = new();
-        private readonly Stack<UnitResult> mem = new();
+        private readonly MathContext _parent;
         public readonly HashSet<string> EnabledUnitPacks = new();
+        public readonly Component? function;
+        private readonly Stack<UnitResult> mem = new();
+        private readonly Dictionary<string, Component> var = new();
 
-        public MathContext(MathContext? parent)
+        public MathContext(MathContext parent, Component? function = null)
         {
-            foreach (var enabled in (_parent = parent)?.EnabledUnitPacks ?? ArraySegment<string>.Empty.AsEnumerable())
+            _parent = parent;
+            this.function = function ?? parent?.function;
+            foreach (var enabled in parent?.EnabledUnitPacks ?? ArraySegment<string>.Empty.AsEnumerable())
                 EnabledUnitPacks.Add(enabled);
         }
+
+        public bool Root => _parent == null && function == null;
+        public Component Function => function ?? throw new Exception("No Function in context");
 
         public Component? this[string key]
         {
@@ -1364,7 +948,10 @@ namespace clmath
                     if (_parent != null)
                         _parent[key] = null;
                 }
-                else var[key] = value;
+                else
+                {
+                    var[key] = value;
+                }
             }
         }
 
@@ -1378,13 +965,25 @@ namespace clmath
             }
         }
 
-        public IEnumerable<KeyValuePair<string, Component>> Vars() => var.Concat(_parent?.Vars() ?? ArraySegment<KeyValuePair<string, Component>>.Empty);
+        public IEnumerable<KeyValuePair<string, Component>> Vars()
+        {
+            return var.Concat(_parent?.Vars() ?? ArraySegment<KeyValuePair<string, Component>>.Empty);
+        }
 
-        public void ClearVars() => var.Clear();
+        public void ClearVars()
+        {
+            var.Clear();
+        }
 
-        public IEnumerable<UnitResult> Mem() => mem.Concat(_parent?.Mem() ?? ArraySegment<UnitResult>.Empty);
+        public IEnumerable<UnitResult> Mem()
+        {
+            return mem.Concat(_parent?.Mem() ?? ArraySegment<UnitResult>.Empty);
+        }
 
-        public void ClearMem() => mem.Clear();
+        public void ClearMem()
+        {
+            mem.Clear();
+        }
 
         public UnitPackage[] GetUnitPackages()
         {
@@ -1394,7 +993,9 @@ namespace clmath
                 .ToArray();
         }
 
-        public Unit? FindUnit(string id) =>
-            GetUnitPackages().SelectMany(x => x.values.Values).FirstOrDefault(x => x.Repr == id);
+        public Unit? FindUnit(string id)
+        {
+            return GetUnitPackages().SelectMany(x => x.values.Values).FirstOrDefault(x => x.Repr == id);
+        }
     }
 }

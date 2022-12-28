@@ -1,4 +1,5 @@
 ﻿// ReSharper disable once ArrangeNamespaceBody
+
 namespace clmath
 {
     public sealed class Solver
