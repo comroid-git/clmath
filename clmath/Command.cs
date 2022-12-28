@@ -12,19 +12,19 @@ namespace clmath
 
     public interface IVariableCmd<T> : ICmd
     {
-        [Value(0, Required = false, Default = null, HelpText = "The variable to work with")]
+        [Value(0, MetaName = "Variable", Required = false, Default = null, HelpText = "The variable to work with")]
         public T? Variable { get; set; }
     }
 
     public interface ITargetCmd<T> : ICmd
     {
-        [Value(0, Required = false, Default = null, HelpText = "The target to use")]
+        [Value(0, MetaName = "Target", Required = false, Default = null, HelpText = "The target to use")]
         public T? Target { get; set; }
     }
 
     public interface IAcceptValueCmd<T> : ICmd
     {
-        [Value(1, Required = false, Default = null, HelpText = "The new value")]
+        [Value(1, MetaName = "Value", Required = false, Default = null, HelpText = "The new value")]
         public T? Value { get; set; }
     }
 
@@ -200,25 +200,25 @@ namespace clmath
         [Option('n', "variable", HelpText = "The variable name to use when unsure")]
         public string Variable { get; set; }
 
-        [Value(0, Required = true, HelpText = "The first function to display")]
+        [Value(0, MetaName = "Function1", Required = true, HelpText = "The first function to display")]
         public string Function { get; set; }
 
-        [Value(1, Required = false, HelpText = "The second function to display")]
+        [Value(1, MetaName = "Function2", Required = false, HelpText = "The second function to display")]
         public string Function2 { get; set; }
 
-        [Value(2, Required = false, Hidden = true, HelpText = "The third function to display")]
+        [Value(2, MetaName = "Function3", Required = false, Hidden = true, HelpText = "The third function to display")]
         public string Function3 { get; set; }
 
-        [Value(3, Required = false, Hidden = true, HelpText = "The fourth function to display")]
+        [Value(3, MetaName = "Function4", Required = false, Hidden = true, HelpText = "The fourth function to display")]
         public string Function4 { get; set; }
 
-        [Value(4, Required = false, Hidden = true, HelpText = "The fifth function to display")]
+        [Value(4, MetaName = "Function5", Required = false, Hidden = true, HelpText = "The fifth function to display")]
         public string Function5 { get; set; }
 
-        [Value(5, Required = false, Hidden = true, HelpText = "The sixth function to display")]
+        [Value(5, MetaName = "Function6", Required = false, Hidden = true, HelpText = "The sixth function to display")]
         public string Function6 { get; set; }
 
-        [Value(6, Required = false, HelpText = "The seventh function to display")]
+        [Value(6, MetaName = "Function7", Required = false, HelpText = "The seventh function to display")]
         public string Function7 { get; set; }
 
         public bool Verbose { get; set; }
@@ -227,13 +227,13 @@ namespace clmath
     [Verb("solve", HelpText = "Solve an equation for a variable")]
     public class SolveCommand : ICmd
     {
-        [Value(0, Required = true, HelpText = "The variable to solve for")]
+        [Value(0, MetaName = "For", Required = true, HelpText = "The variable to solve for")]
         public string For { get; set; }
 
-        [Value(1, Required = true, HelpText = "The left hand side of the equation; must be a singular variable")]
+        [Value(1, MetaName = "LHS", Required = true, HelpText = "The left hand side of the equation; must be a singular variable")]
         public string LHS { get; set; }
 
-        [Value(2, Required = false, HelpText = "The function to solve")]
+        [Value(2, MetaName = "Function", Required = false, HelpText = "The function to solve")]
         public string Function { get; set; }
 
         public bool Verbose { get; set; }
