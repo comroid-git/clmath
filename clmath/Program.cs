@@ -711,6 +711,7 @@ namespace clmath
                     data = Current.Vars().Select(entry => ((object)entry.Key, (object)entry.Value));
                     break;
                 case ListCommand.TargetType.func:
+                    colDataText = "Term";
                     data = Directory.EnumerateFiles(dir, '*' + FuncExt)
                         .Select(path => new FileInfo(path).Name)
                         .Select(name => name.Substring(0, name.IndexOf(FuncExt, StringComparison.Ordinal)))
@@ -720,14 +721,19 @@ namespace clmath
                     data = constants.Select(entry => ((object)entry.Key, (object)entry.Value));
                     break;
                 case ListCommand.TargetType.stack:
-                    data = Stack.Where(it => !it.Root).Select(ctx => ((object)++c, (object)ctx.function!));
+                    colIdText = "Index";
+                    colDataText = "Term";
+                    data = Stack.Where(it => !it.Root).Select(ctx => ((object)c++, (object)ctx.function!));
                     break;
                 case ListCommand.TargetType.mem:
-                    c = Current.Mem().Count();
-                    data = Current.Mem().Select(comp => ((object)--c, (object)comp));
+                    colIdText = "Index";
+                    colDataText = "Value";
+                    data = Current.Mem().Reverse().Select(comp => ((object)c++, (object)comp));
                     break;
                 case ListCommand.TargetType.stash:
-                    data = stash.Select(comp => ((object)++c, (object)comp));
+                    colIdText = "Index";
+                    colDataText = "Term";
+                    data = stash.Select(comp => ((object)c++, (object)comp.function!));
                     break;
                 case ListCommand.TargetType.enabled:
                     colDataText = "Unit ID";
@@ -758,7 +764,11 @@ namespace clmath
                     .SetData(colData, obj);
             if (table.Rows.Count == 0)
                 Console.WriteLine("Nothing to display");
-            else Console.Write(table);
+            else
+            {
+                Console.Clear();
+                Console.Write(table);
+            }
         }
 
         private static void HandleEdit(EditCommand cmd)
