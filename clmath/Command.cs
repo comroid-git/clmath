@@ -30,12 +30,6 @@ namespace clmath
 
     #region Generic
 
-    [Verb("help", true, HelpText = "Prints a help page")]
-    public class HelpCommand : ICmd
-    {
-        public bool Verbose { get; set; }
-    }
-
     [Verb("exit", HelpText = "Closes the program")]
     public class ExitCommand : ICmd
     {

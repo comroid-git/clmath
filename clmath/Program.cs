@@ -252,26 +252,26 @@ namespace clmath
                 Console.Write("math> ");
                 var input = Console.ReadLine()!;
                 ParseInput(input, new Dictionary<Type, Action<ICmd>>()
-                    {
-                        { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
-                        { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
-                        { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
-                        { typeof(EditCommand), cmd => HandleEdit((EditCommand)cmd) },
-                        { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
-                        { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
-                        { typeof(RenameCommand), cmd => HandleRename((RenameCommand)cmd) },
-                        { typeof(DeleteCommand), cmd => HandleDelete((DeleteCommand)cmd) },
-                        { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
-                        { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
-                        { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
-                        { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
-                        { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) }
-                    })
-                    .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, errors =>
-                    {
-                        foreach (var error in errors) HandleException(new Exception(error.ToString()));
-                        EvalMode(new MathContext(Current, ParseFunc(input)));
-                    }));
+                {
+                    { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
+                    { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
+                    { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
+                    { typeof(EditCommand), cmd => HandleEdit((EditCommand)cmd) },
+                    { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
+                    { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
+                    { typeof(RenameCommand), cmd => HandleRename((RenameCommand)cmd) },
+                    { typeof(DeleteCommand), cmd => HandleDelete((DeleteCommand)cmd) },
+                    { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
+                    { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
+                    { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
+                    { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
+                    { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) }
+                }, func =>
+                {
+                    var ctx = new MathContext(Current, ParseFunc(func));
+                    Stack.Push(ctx);
+                    EvalMode(ctx);
+                });
             }
         }
 
@@ -308,26 +308,22 @@ namespace clmath
                     else
                     {
                         ParseInput(input, new Dictionary<Type, Action<ICmd>>()
-                            {
-                                { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
-                                { typeof(DropCommand), cmd => HandleDrop((DropCommand)cmd) },
-                                { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
-                                { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
-                                { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
-                                { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
-                                { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
-                                { typeof(SaveCommand), cmd => HandleSave((SaveCommand)cmd) },
-                                { typeof(StashCommand), cmd => HandleStash((StashCommand)cmd) },
-                                { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
-                                { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
-                                { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
-                                { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) },
-                                { typeof(EvalCommand), cmd => HandleEval((EvalCommand)cmd) }
-                            })
-                            .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, errors =>
-                            {
-                                foreach (var error in errors) HandleException(new Exception(error.ToString()));
-                            }));
+                        {
+                            { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
+                            { typeof(DropCommand), cmd => HandleDrop((DropCommand)cmd) },
+                            { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
+                            { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
+                            { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
+                            { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
+                            { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
+                            { typeof(SaveCommand), cmd => HandleSave((SaveCommand)cmd) },
+                            { typeof(StashCommand), cmd => HandleStash((StashCommand)cmd) },
+                            { typeof(RestoreCommand), cmd => HandleRestore((RestoreCommand)cmd) },
+                            { typeof(ModeCommand), cmd => HandleMode((ModeCommand)cmd) },
+                            { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) },
+                            { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) },
+                            { typeof(EvalCommand), cmd => HandleEval((EvalCommand)cmd) }
+                        });
                     }
                 }
             }
@@ -335,16 +331,55 @@ namespace clmath
 
         #region Utilities
 
-        private static ParserResult<object> ParseInput(string input, Dictionary<Type, Action<ICmd>> bindings)
+        private static void ParseInput(string input, Dictionary<Type, Action<ICmd>> bindings, Action<string>? fallback = null)
         {
             var types = bindings.Keys.ToArray();
             var result = Parser.ParseArguments(input.Split(" "), types);
             result
-                .WithParsed(WithExceptionHandler<HelpCommand>(HandleException, _ => ShowHelp(result, types)))
+                .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException,
+                    errors => HandleParseErrors(errors, result, types, fallback != null)))
                 .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit));
-            if (bindings.FirstOrDefault((entry) => entry.Key.IsInstanceOfType(result.Value)) is var pair)
+            if (bindings.FirstOrDefault((entry) => entry.Key.IsInstanceOfType(result.Value)) is {Key: not null, Value: not null} pair)
                 WithExceptionHandler<ICmd>(HandleException, (cmd) => pair.Value(cmd))((result.Value as ICmd)!);
-            return result;
+            else if (fallback != null && result.Errors.All(e => e.Tag == ErrorType.BadVerbSelectedError))
+                fallback(input);
+        }
+
+        private static void HandleParseErrors(IEnumerable<Error> obj, ParserResult<object> parserResult, Type[] types, bool skipOnBadVerb)
+        {
+            var errorText = string.Empty;
+            foreach (var error in obj)
+            {
+                switch (error)
+                {
+                    case VersionRequestedError:
+                        Console.WriteLine(VersionText);
+                        return;
+                    case HelpRequestedError:
+                        ShowHelp(parserResult, types, null);
+                        return;
+                    case HelpVerbRequestedError hvre:
+                        ShowHelp(parserResult, types, hvre.Matched ? hvre.Verb : null);
+                        return;
+                    case BadVerbSelectedError bvse:
+                        if (skipOnBadVerb)
+                            return;
+                        errorText += $"\nInvalid command '{bvse.Token}'; type 'help' for a list of commands";
+                        break;
+                    case MissingRequiredOptionError mroe:
+                        errorText += $"\nMissing required argument {mroe.NameInfo.NameText}";
+                        break;
+                    case BadFormatConversionError bfce:
+                        errorText += $"\nUnable to parse argument {bfce.NameInfo.NameText}";
+                        break;
+                    default:
+                        errorText += $"\nInternal {error}";
+                        break;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(errorText))
+                throw new Exception(errorText.Substring(1));
         }
 
         private static byte[] Read(Stream s, int len)
@@ -604,14 +639,22 @@ namespace clmath
 
         #region Command Handlers
 
-        private static void ShowHelp<T>(ParserResult<T> result, Type[] types)
+        private static string VersionText = $"clmath @ {GetAssemblyVersion<MathContext>()}";
+
+        private static void ShowHelp<T>(ParserResult<T> result, Type[] types, string? verb)
         {
             var helpText = CommandLine.Text.HelpText.AutoBuild(
                 result, text => text, text => text, maxDisplayWidth: 120);
             helpText.MaximumDisplayWidth = Console.WindowWidth;
-            helpText.Heading = $"clmath @ {GetAssemblyVersion<MathContext>()}";
+            helpText.Heading = VersionText;
             helpText.Copyright = "comroid";
-            helpText.AddVerbs(types);
+            helpText.AddDashesToOption = false;
+            helpText.AdditionalNewLineAfterOption = false;
+            helpText.AddEnumValuesToHelpText = true;
+            var verbs = verb == null ? types
+                : types.Where(t => t.Name.StartsWith(verb, true, CultureInfo.InvariantCulture));
+            helpText.AddOptions(result);
+            helpText.AddVerbs(verbs.ToArray());
             Console.WriteLine(helpText);
         }
 
