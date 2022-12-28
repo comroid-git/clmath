@@ -935,7 +935,7 @@ namespace clmath
             }
 
             var result = new Solver(cmd.Verbose).Solve(ctx.Function, lhs, target);
-            EvalMode(new MathContext(ctx, result));
+            Stack.Push(new MathContext(ctx, result));
         }
 
         private static void HandleGraph(GraphCommand cmd)
