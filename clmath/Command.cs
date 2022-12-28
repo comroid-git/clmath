@@ -12,20 +12,20 @@ namespace clmath
 
     public interface IVariableCmd<T> : ICmd
     {
-        [Value(0, Required = true, HelpText = "The variable to work with")]
-        public T Variable { get; set; }
+        [Value(0, Required = false, Default = null, HelpText = "The variable to work with")]
+        public T? Variable { get; set; }
     }
 
     public interface ITargetCmd<T> : ICmd
     {
-        [Value(0, Required = true, HelpText = "The target to use")]
-        public T Target { get; set; }
+        [Value(0, Required = false, Default = null, HelpText = "The target to use")]
+        public T? Target { get; set; }
     }
 
     public interface IAcceptValueCmd<T> : ICmd
     {
-        [Value(1, Required = true, HelpText = "The new value")]
-        public T Value { get; set; }
+        [Value(1, Required = false, Default = null, HelpText = "The new value")]
+        public T? Value { get; set; }
     }
 
     #region Generic
