@@ -788,6 +788,7 @@ namespace clmath
             var ClearMemory = Current.ClearMem;
             var ClearStash = stash.Clear;
             var ClearStack = Stack.Clear;
+            var ClearResults = results.Values.Clear;
             switch (cmd.Target)
             {
                 case ClearCommand.TargetType.vars:
@@ -802,11 +803,15 @@ namespace clmath
                 case ClearCommand.TargetType.stack:
                     ClearStack();
                     break;
+                case ClearCommand.TargetType.results:
+                    ClearResults();
+                    break;
                 case ClearCommand.TargetType.all:
                     ClearVars();
                     ClearMemory();
                     ClearStash();
                     ClearStack();
+                    ClearResults();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown clear Target");

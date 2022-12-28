@@ -156,6 +156,7 @@ namespace clmath
             mem,
             stash,
             stack,
+            results,
             all
         }
 
