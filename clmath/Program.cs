@@ -283,6 +283,7 @@ namespace clmath
             {
                 var res = func.Evaluate(new MathContext(BaseContext));
                 PrintResult(func, res, BaseContext, false);
+                Stack.Pop();
             }
             else
             {
