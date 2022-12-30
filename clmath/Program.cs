@@ -217,23 +217,23 @@ namespace clmath
 
         public static void Main(params string[] args)
         {
-            Parser.ParseArguments<GraphCommand, SolveCommand>(args)
-                .WithParsed(WithExceptionHandler<GraphCommand>(HandleException, HandleGraph))
-                .WithParsed(WithExceptionHandler<SolveCommand>(HandleException, HandleSolve))
-                .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException, _ =>
+            ParseInput(string.Join(" ", args), new Dictionary<Type, Action<ICmd>>()
+            {
+                {typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd)},
+                {typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd)}
+            }, (input) =>
+            {
+                if (args.Length == 0)
                 {
-                    if (args.Length == 0)
-                    {
-                        StdIoMode();
-                    }
-                    else
-                    {
-                        var arg = string.Join(" ", args);
-                        EvalMode(new MathContext(BaseContext, ParseFunc(File.ReadAllText(arg))));
-                        Console.WriteLine("Press any key to exit...");
-                        Console.ReadLine();
-                    }
-                }));
+                    StdIoMode();
+                }
+                else
+                {
+                    EvalMode(new MathContext(BaseContext, ParseFunc(File.ReadAllText(input))));
+                    Console.WriteLine("Press any key to exit...");
+                    Console.ReadLine();
+                }
+            });
             Save();
             _exiting = false;
         }
