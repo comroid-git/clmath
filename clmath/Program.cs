@@ -603,7 +603,7 @@ namespace clmath
             };
         }
 
-        internal static string StripExtension(this string str, string ext)
+        private static string StripExtension(this string str, string ext)
         {
             if (str.EndsWith(ext))
                 str = str.Substring(0, str.IndexOf(ext, StringComparison.Ordinal));
@@ -735,7 +735,7 @@ namespace clmath
                     colDataText = "Term";
                     data = Directory.EnumerateFiles(dir, '*' + FuncExt)
                         .Select(path => new FileInfo(path).Name)
-                        .Select(name => name.Substring(0, name.IndexOf(FuncExt, StringComparison.Ordinal)))
+                        .Select(name => name.StripExtension(FuncExt))
                         .Select(name => ((object)name, (object)LoadFunc(name)?.function!));
                     break;
                 case ListCommand.TargetType.constant:
