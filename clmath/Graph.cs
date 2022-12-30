@@ -42,8 +42,8 @@ namespace clmath
 
         private uint ax_vao;
         private uint ax_vbo;
-        private double scaleX = 15;
-        private double scaleY = 6;
+        private double scaleX = 500;
+        private double scaleY = 5;
         private uint shaders;
 
         static Graph()
@@ -51,14 +51,13 @@ namespace clmath
             AssemblyDir = new FileInfo(typeof(Graph).Assembly.Location).Directory!;
         }
 
-        public Graph(params MathContext[] funcs)
+#pragma warning disable CS8618
+        public Graph(params MathContext[] ctxs)
+#pragma warning restore CS8618
         {
-            var fxn = funcs.Length;
+            var fxn = ctxs.Length;
             if (fxn > maxFuncs)
-            {
-                Console.WriteLine($"Error: Cannot display more than {maxFuncs} functions");
-                return;
-            }
+                throw new Exception($"Error: Cannot display more than {maxFuncs} functions");
 
             window = Window.Create(WindowOptions.Default);
 
@@ -70,20 +69,17 @@ namespace clmath
             x = new Component[fxn];
             for (var i = 0; i < fxn; i++)
             {
-                fx[i] = funcs[i].Function;
-                ctx[i] = new MathContext(funcs[i]);
+                fx[i] = ctxs[i].Function;
+                ctx[i] = new MathContext(ctxs[i]);
                 var vars = fx[i].GetVars().Where(var => !Program.constants.ContainsKey(var)).ToList();
                 if (vars.Count(s => ctx[i].Vars().All(y => y.Key != s)) > 1)
-                {
-                    Console.WriteLine("Error: More than 1 variable is unset");
-                    return;
-                }
+                    throw new Exception("Error: More than 1 variable is unset");
 
                 var key = vars.FirstOrDefault(s => ctx[i].Vars().All(y => y.Key != s));
                 if (key == null)
                 {
                     key = vars[0];
-                    Console.WriteLine($"Error: No variable is unset; falling back to {key}");
+                    Console.WriteLine($"Warning: No variable is unset; falling back to {key}");
                 }
 
                 ctx[i][key] = x[i] = new Component { type = Component.Type.Num, arg = (double)0 };
@@ -115,15 +111,16 @@ namespace clmath
         {
             if (key == Key.Escape)
                 window.Close();
-            const double delta = 0.5;
-            if (key == Key.Keypad2 && scaleY > delta)
-                scaleY -= delta;
-            if (key == Key.Keypad8)
-                scaleY += delta;
-            if (key == Key.Keypad4 && scaleX > delta)
-                scaleX -= delta;
+            const double deltaX = 25;
+            const double deltaY = 0.5;
+            if (key == Key.Keypad4 && scaleX > 0)
+                scaleX -= deltaX;
             if (key == Key.Keypad6)
-                scaleX += delta;
+                scaleX += deltaX;
+            if (key == Key.Keypad2 && scaleY > 0)
+                scaleY -= deltaY;
+            if (key == Key.Keypad8)
+                scaleY += deltaY;
             InitGraphCurve();
         }
 

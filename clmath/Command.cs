@@ -201,7 +201,7 @@ namespace clmath
         [Option('n', "variable", HelpText = "The variable name to use when unsure")]
         public string Variable { get; set; }
 
-        [Value(0, MetaName = "Function1", Required = true, HelpText = "The first function to display")]
+        [Value(0, MetaName = "Function1", Required = false, HelpText = "The first function to display")]
         public string Function { get; set; }
 
         [Value(1, MetaName = "Function2", Required = false, HelpText = "The second function to display")]

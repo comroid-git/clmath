@@ -526,12 +526,6 @@ namespace clmath
             return missing;
         }
 
-        private static void StartGraph(params MathContext[] funcs)
-        {
-            _graph?.Dispose();
-            _graph = new Graph(funcs);
-        }
-
         private static void DumpVariables(this MathContext ctx, MultiEntryTable.Entry? entry = null,
             bool shouldError = true, Func<string, bool>? includeVar = null)
         {
@@ -949,12 +943,17 @@ namespace clmath
 
         private static void HandleGraph(GraphCommand cmd)
         {
-            StartGraph(CreateArgsFuncs(0,
-                new[]
+            _graph?.Dispose();
+            _graph = new Graph(Stack
+                .Where(ctx => ctx.function != null
+                              && ctx.Function.GetVars().Count(var => !constants.ContainsKey(var)) == 1 
+                              && ctx.Vars().All(pair => globalConstants.ContainsKey(pair.Key)))
+                .Concat(CreateArgsFuncs(0, new[]
                 {
                     cmd.Function, cmd.Function2, cmd.Function3, cmd.Function4,
                     cmd.Function5, cmd.Function6, cmd.Function7
-                }.Where(it => it != null).ToArray()));
+                }.Where(it => it != null).ToArray()))
+                .ToArray());
         }
 
         private static void HandleException(Exception e)
