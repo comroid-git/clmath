@@ -474,7 +474,7 @@ namespace clmath
             var input = new AntlrInputStream(f);
             var lexer = new MathLexer(input);
             var tokens = new CommonTokenStream(lexer);
-            var parser = new MathParser(tokens);
+            var parser = new MathParser(tokens) { ErrorHandler = new BailErrorStrategy() };
             return new MathCompiler().Visit(parser.expr());
         }
 
