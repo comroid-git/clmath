@@ -39,7 +39,6 @@ namespace clmath
         private static readonly int ConfigVersion;
         private static bool _exiting;
         private static bool _resetting;
-        private static bool _dropAll;
         private static Graph? _graph;
 
         private static readonly Dictionary<string, double> globalConstants = new()
@@ -248,7 +247,6 @@ namespace clmath
                     HandleClear(new ClearCommand { Target = ClearCommand.TargetType.all });
                 }
 
-                _dropAll = false;
                 Console.Title = $"[{DRG}] clmath";
                 Console.Write("math> ");
                 var input = Console.ReadLine()!;
@@ -289,7 +287,7 @@ namespace clmath
             {
                 var cc = 0;
                 // enter editor mode
-                while (!(Current.Root || _exiting || _dropAll))
+                while (!(Current.Root || _exiting))
                 {
                     func = Current.function;
                     Console.Title = $"[{DRG}] {func}";
@@ -686,7 +684,6 @@ namespace clmath
                     break;
                 case "all":
                     Stack.Clear();
-                    _dropAll = true;
                     break;
                 case not null:
                     if (!Regex.IsMatch(cmd.Target!, "\\d+"))
@@ -698,6 +695,8 @@ namespace clmath
                         else Stack.Pop();
                     break;
             }
+            if (Stack.Count == 0)
+                Stack.Push(BaseContext);
         }
 
         private static void HandleSet(SetCommand cmd)
