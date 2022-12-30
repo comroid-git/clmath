@@ -218,10 +218,9 @@ namespace clmath
     public sealed class Unit : AbstractUnit
     {
         public static readonly Unit None = new(UnitPackage.None, string.Empty, string.Empty);
-        private readonly ConcurrentDictionary<(string repr, Component.Operator op), UnitEvaluator> Evaluators = new();
+        internal readonly ConcurrentDictionary<(string repr, Component.Operator op), UnitEvaluator> Evaluators = new();
         public readonly UnitPackage Package;
         internal string _repr;
-        internal bool Finalized;
 
         internal Unit(UnitPackage package, string name, string repr)
         {
@@ -238,6 +237,7 @@ namespace clmath
 
         public string Name { get; internal set; }
         public override string Repr => _repr;
+        public string Path => System.IO.Path.Combine(Package.Path, Name + Program.UnitExt);
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
         {
@@ -248,6 +248,11 @@ namespace clmath
         {
             return Evaluators
                 .Select(entry => (new UnitRef(entry.Key.repr), entry.Key.op, entry.Value));
+        }
+
+        public override string ToString()
+        {
+            return Name;
         }
     }
 
@@ -268,8 +273,7 @@ namespace clmath
         {
             if (string.IsNullOrEmpty(Repr))
                 return Unit.None;
-            var result = (ctx ?? throw new ArgumentNullException(nameof(ctx), "Context may not be null for UnitRef"))
-                .GetUnitPackages()
+            var result = Program.unitPackages.Values
                 .SelectMany(pkg => pkg.values)
                 .Where(unit => unit.Key == Repr)
                 .Select(entry => entry.Value)
@@ -293,6 +297,7 @@ namespace clmath
 
     public sealed class UnitEvaluator
     {
+        internal bool finalized = false;
         public readonly Component.Operator? op;
         public readonly AbstractUnit output;
         public readonly double? overrideY;
@@ -321,6 +326,7 @@ namespace clmath
         }
 
         public string Name { get; }
+        public string Path => System.IO.Path.Combine(Program.dir, Name + Program.UnitPackExt);
 
         public AbstractUnit Get(string id)
         {
@@ -413,9 +419,7 @@ namespace clmath
         {
             foreach (var inputA in values.Values)
             {
-                if (inputA.Finalized)
-                    continue;
-                foreach (var (other, op, eval) in inputA.GetEvaluators())
+                foreach (var (other, op, eval) in inputA.GetEvaluators().Where((it) => !it.eval.finalized))
                 {
                     var inputB = other?.AsUnit(ctx);
                     var output = eval.output.AsUnit(ctx);
@@ -450,9 +454,9 @@ namespace clmath
                         default:
                             throw new ArgumentOutOfRangeException(nameof(eval.op));
                     }
-                }
 
-                inputA.Finalized = true;
+                    eval.finalized = true;
+                }
             }
         }
 

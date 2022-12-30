@@ -8,6 +8,7 @@ using clmath.Antlr;
 using CommandLine;
 using CommandLine.Text;
 using comroid.csapi.common;
+using JetBrains.Annotations;
 using static comroid.csapi.common.DebugUtil;
 using Parser = CommandLine.Parser;
 
@@ -28,12 +29,12 @@ namespace clmath
         internal static readonly string UnitExt = ".unit";
         internal static readonly string UnitPackExt = ".units";
 
-        private static readonly string dir = Path.Combine(
+        internal static readonly string dir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "comroid", "clmath");
 
         private static readonly string constantsFile = Path.Combine(dir, "constants" + ConstExt);
-        private static readonly string configFile = Path.Combine(dir, "config.bin");
+        private static readonly string configFile = Path.Combine(dir, "config.json");
 
         public static Parser Parser;
         private static readonly int ConfigVersion;
@@ -52,14 +53,49 @@ namespace clmath
 
         public static readonly ConcurrentDictionary<string, UnitPackage> unitPackages = new();
         private static readonly Stack<MathContext> stash = new();
-        private static readonly MultiEntryTable results = new();
+        private static readonly MultiEntryTable results;
 
-        private static UnitPackage selectedPkg;
-        private static Unit selectedUnit;
+        private static object? editTarget;
+
         public static MathContext Current => Stack.Peek();
 
-        public static CalcMode DRG { get; set; } = CalcMode.Deg;
-        public static bool AutoEval { get; set; } = true;
+        public static readonly ConfigBase Config = new()
+        {
+            { "autoEval", Convert.ToBoolean, () => true },
+            {
+                "drg", key =>
+                {
+                    Enum.TryParse<CalcMode>(key, out var result);
+                    return result;
+                },
+                () => CalcMode.Deg
+            },
+            {
+                "lineMode", key =>
+                {
+                    Enum.TryParse<TextTable.LineMode>(key, out var result);
+                    return result;
+                },
+                () => TextTable.LineMode.Unicode
+            }
+        };
+
+        public static CalcMode DRG
+        {
+            get => Config.Get<CalcMode>("drg");
+            set => Config["drg"] = value;
+        }
+        public static bool AutoEval
+        {
+            get => Config.Get<bool>("autoEval");
+            set => Config["autoEval"] = value;
+        }
+        public static TextTable.LineMode LineMode
+        {
+            get => Config.Get<TextTable.LineMode>("lineMode");
+            set => Config["lineMode"] = value;
+        }
+
         public static Dictionary<string, double> constants { get; private set; } = null!;
         #endregion
 
@@ -93,6 +129,7 @@ namespace clmath
 
             LoadConstants();
             LoadUnits(BaseContext);
+            results = new() { Lines = LineMode };
         }
 
         public static void SetUp()
@@ -175,31 +212,19 @@ namespace clmath
 
         private static void SaveConfig()
         {
-            using var fs = File.OpenWrite(configFile);
-            fs.Write(BitConverter.GetBytes(ConfigVersion));
-            fs.Write(new[] { (byte)DRG });
-            fs.Write(BitConverter.GetBytes(AutoEval));
-            fs.Write(BitConverter.GetBytes(BaseContext.EnabledUnitPacks.Count));
-            foreach (var pack in BaseContext.EnabledUnitPacks)
-            {
-                var buffer = Encoding.ASCII.GetBytes(pack);
-                fs.Write(BitConverter.GetBytes(buffer.Length));
-                fs.Write(buffer);
-            }
+            Config.Save(configFile);
         }
 
         private static bool LoadConfig()
         {
-            using var fs = File.OpenRead(configFile);
-            if (ConfigVersion != BitConverter.ToInt32(Read(fs, sizeof(int))))
-                return false;
-            DRG = (CalcMode)Read(fs, 1)[0];
-            AutoEval = BitConverter.ToBoolean(Read(fs, sizeof(bool)));
-            var enabledPackCount = BitConverter.ToInt32(Read(fs, sizeof(int)));
-            for (; enabledPackCount > 0; enabledPackCount--)
+            try
             {
-                var len = BitConverter.ToInt32(Read(fs, sizeof(int)));
-                BaseContext.EnabledUnitPacks.Add(Encoding.ASCII.GetString(Read(fs, len)));
+                Config.Load(configFile);
+            }
+            catch
+            {
+                Console.WriteLine("Configuration could not be loaded; it was reset to defaults.");
+                return false;
             }
 
             return true;
@@ -219,9 +244,10 @@ namespace clmath
         {
             ParseInput(string.Join(" ", args), new Dictionary<Type, Action<ICmd>>()
             {
-                {typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd)},
-                {typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd)}
-            }, (input) =>
+                { typeof(EditCommand), cmd => HandleEditConfig((EditCommand)cmd) },
+                { typeof(GraphCommand), cmd => HandleGraph((GraphCommand)cmd) },
+                { typeof(SolveCommand), cmd => HandleSolve((SolveCommand)cmd) }
+            }, (_) =>
             {
                 if (args.Length == 0)
                 {
@@ -251,12 +277,12 @@ namespace clmath
                 Console.Title = $"[{DRG}] clmath";
                 Console.Write("math> ");
                 var input = Console.ReadLine()!;
-                ParseInput(input, new Dictionary<Type, Action<ICmd>>()
+                _exiting = ParseInput(input, new Dictionary<Type, Action<ICmd>>()
                 {
-                    { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
-                    { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
                     { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
-                    { typeof(EditCommand), cmd => HandleEdit((EditCommand)cmd) },
+                    { typeof(EditCommand), cmd => HandleEditConfig((EditCommand)cmd) },
+                    { typeof(SetCommand), cmd => HandleSetConst((SetCommand)cmd) },
+                    { typeof(UnsetCommand), cmd => HandleUnsetConst((UnsetCommand)cmd) },
                     { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
                     { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
                     { typeof(RenameCommand), cmd => HandleRename((RenameCommand)cmd) },
@@ -308,13 +334,14 @@ namespace clmath
                     }
                     else
                     {
-                        ParseInput(input, new Dictionary<Type, Action<ICmd>>()
+                        _exiting = ParseInput(input, new Dictionary<Type, Action<ICmd>>()
                         {
                             { typeof(CopyCommand), cmd => HandleCopy((CopyCommand)cmd) },
                             { typeof(DropCommand), cmd => HandleDrop((DropCommand)cmd) },
                             { typeof(ClearCommand), cmd => HandleClear((ClearCommand)cmd) },
-                            { typeof(SetCommand), cmd => HandleSet((SetCommand)cmd) },
-                            { typeof(UnsetCommand), cmd => HandleUnset((UnsetCommand)cmd) },
+                            { typeof(EditCommand), cmd => HandleEditConfig((EditCommand)cmd) },
+                            { typeof(SetCommand), cmd => HandleSetConst((SetCommand)cmd) },
+                            { typeof(UnsetCommand), cmd => HandleUnsetConst((UnsetCommand)cmd) },
                             { typeof(ListCommand), cmd => HandleList((ListCommand)cmd) },
                             { typeof(LoadCommand), cmd => HandleLoad((LoadCommand)cmd) },
                             { typeof(SaveCommand), cmd => HandleSave((SaveCommand)cmd) },
@@ -329,21 +356,43 @@ namespace clmath
                 }
             }
         }
+        
+        private static void EditMode()
+        {
+            var exiting = false;
+            string input;
+            do
+            {
+                Console.Write($"editing {{{editTarget?.ToString() ?? "config"}}}> ");
+                input = Console.ReadLine()!;
+            } while (!ParseInput(input,
+                         new Dictionary<Type, Action<ICmd>>()
+                         {
+                             { typeof(EditCommand), cmd => HandleEditConfig((EditCommand)cmd) },
+                             { typeof(GetCommand), cmd => HandleGetConfig((GetCommand)cmd) },
+                             { typeof(SetCommand), cmd => HandleSetConfig((SetCommand)cmd) },
+                             { typeof(UnsetCommand), cmd => HandleUnsetConfig((UnsetCommand)cmd) },
+                             { typeof(AddCommand), cmd => HandleAddConfig((AddCommand)cmd) },
+                             { typeof(RemoveCommand), cmd => HandleRemoveConfig((RemoveCommand)cmd) }
+                         }));
+        }
 
         #region Utilities
 
-        private static void ParseInput(string input, Dictionary<Type, Action<ICmd>> bindings, Action<string>? fallback = null)
+        private static bool ParseInput(string input, Dictionary<Type, Action<ICmd>> bindings, Action<string>? fallback = null)
         {
-            var types = bindings.Keys.ToArray();
+            var types = bindings.Keys.Append(typeof(ExitCommand)).ToArray();
             var result = Parser.ParseArguments(input.Split(" "), types);
+            var exitRequested = false;
             result
                 .WithNotParsed(WithExceptionHandler<IEnumerable<Error>>(HandleException,
                     errors => HandleParseErrors(errors, result, types, fallback != null)))
-                .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, HandleExit));
+                .WithParsed(WithExceptionHandler<ExitCommand>(HandleException, (_) => exitRequested = true));
             if (bindings.FirstOrDefault((entry) => entry.Key.IsInstanceOfType(result.Value)) is {Key: not null, Value: not null} pair)
                 WithExceptionHandler<ICmd>(HandleException, (cmd) => pair.Value(cmd))((result.Value as ICmd)!);
             else if (fallback != null && result.Errors.All(e => e.Tag == ErrorType.BadVerbSelectedError))
                 WithExceptionHandler(HandleException, fallback)(input);
+            return exitRequested;
         }
 
         private static void HandleParseErrors(IEnumerable<Error> obj, ParserResult<object> parserResult, Type[] types, bool skipOnBadVerb)
@@ -497,17 +546,17 @@ namespace clmath
             fs.Write(new[] { (byte)'\n' });
 
             // equations
-            string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval)
-            {
-                return $"{unit.Repr}{eval.op switch {
-                    Component.Operator.Multiply => '*',
-                    Component.Operator.Divide => '/',
-                    _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr};";
-            }
-
             foreach (var (other, _, eval) in unit.GetEvaluators())
                 fs.Write(Encoding.ASCII.GetBytes(EvalToString(unit, other, eval) + '\n'));
             fs.Flush();
+        }
+        
+        private static string EvalToString(Unit unit, UnitRef other, UnitEvaluator eval)
+        {
+            return $"{unit.Repr}{eval.op switch {
+                Component.Operator.Multiply => '*',
+                Component.Operator.Divide => '/',
+                _ => throw new ArgumentOutOfRangeException() }}{eval.overrideY?.ToString() ?? other.Repr}={eval.output.Repr};";
         }
 
         private static List<string> FindMissingVariables(Component func, MathContext ctx)
@@ -532,7 +581,7 @@ namespace clmath
             TextTable table = null!;
             if (entry == null)
             {
-                table = new TextTable(true, TextTable.LineMode.Unicode);
+                table = new TextTable { Lines = LineMode };
                 var colTerm = table.AddColumn("Variable");
                 var colExpr = table.AddColumn("Value", true);
                 AddEntryData = (term, value) => table.AddRow().SetData(colTerm, term).SetData(colExpr, value);
@@ -651,11 +700,6 @@ namespace clmath
             Console.WriteLine(helpText);
         }
 
-        private static void HandleExit(ExitCommand _)
-        {
-            _exiting = true;
-        }
-
         private static void HandleCopy(CopyCommand cmd)
         { // todo: support for non Windows OS
             if (Environment.OSVersion.Platform != PlatformID.Win32NT
@@ -699,7 +743,7 @@ namespace clmath
                 Stack.Push(BaseContext);
         }
 
-        private static void HandleSet(SetCommand cmd)
+        private static void HandleSetConst(SetCommand cmd)
         {
             var name = cmd.Variable;
             if (globalConstants.ContainsKey(name))
@@ -709,7 +753,7 @@ namespace clmath
             Console.WriteLine($"Constant {name} was set");
         }
 
-        private static void HandleUnset(UnsetCommand cmd)
+        private static void HandleUnsetConst(UnsetCommand cmd)
         {
             var name = cmd.Variable;
             if (globalConstants.ContainsKey(name))
@@ -722,7 +766,7 @@ namespace clmath
 
         private static void HandleList(ListCommand cmd)
         {
-            var table = new TextTable(lineMode: TextTable.LineMode.Unicode);
+            var table = new TextTable { Lines = LineMode };
             string colIdText = "Name", colDataText = "Value";
             IEnumerable<(object id, object obj)> data;
             var c = 0;
@@ -770,7 +814,7 @@ namespace clmath
                     colDataText = "Unit ID";
                     data = unitPackages.Values
                         .SelectMany(pkg => pkg.values.Values)
-                        .Select(unit => ((object)unit.Name, (object)unit));
+                        .Select(unit => ((object)unit.Name, (object)unit.Repr));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown list Target");
@@ -792,9 +836,170 @@ namespace clmath
             }
         }
 
-        private static void HandleEdit(EditCommand cmd)
+        private static void HandleEditConfig(EditCommand cmd)
         {
-            throw new NotImplementedException();
+            editTarget = cmd.Target switch
+            {
+                EditCommand.TargetType.config => cmd.Value,
+                EditCommand.TargetType.package => cmd.Value != null && unitPackages.ContainsKey(cmd.Value!) ? unitPackages[cmd.Value!] : cmd.Target,
+                EditCommand.TargetType.unit => unitPackages.Values.SelectMany(pkg => pkg.values)
+                    .Where(entry => entry.Key == cmd.Value || entry.Value.Name == cmd.Value)
+                    .Select(entry => entry.Value)
+                    .FirstOrDefault(),
+                _ => string.Empty
+            };
+            EditMode();
+        }
+
+        private static void HandleGetConfig(GetCommand cmd)
+        {
+            var table = new TextTable() { Lines = LineMode, Title = "Configuration Values" };
+            var colName = table.AddColumn("Name");
+            var colValue = table.AddColumn("Value");
+            TextTable.Column? colExtra = null;
+
+            //if (editTarget is not string && cmd.Variable is null)
+            //    throw new Exception("'get' not supported by target " + editTarget?.GetType().Name);
+            IEnumerable<(string name, string value, string extra)> data;
+            switch (editTarget)
+            {
+                case UnitPackage pkg:
+                    colName.Name = "Unit";
+                    colValue.Name = "ID";
+                    data = pkg.values.Select(entry => (entry.Key, entry.Value.ToString(), string.Empty));
+                    break;
+                case Unit unit:
+                    colName.Name = "OP";
+                    colValue.Name = "Equation";
+                    data = unit.Evaluators.Select((entry) =>
+                        (entry.Key.ToString(), EvalToString(unit, new UnitRef(entry.Key.repr), entry.Value), string.Empty));
+                    break;
+                default:
+                    colExtra = table.AddColumn("Type");
+                    data = Config.Entries.Select(entry => (entry.Key, entry.Value.ConvertOutput(), entry.Value.Type.FullName!));
+                    break;
+            }
+            if ((cmd.Variable ?? editTarget as string) is { } ovr)
+                data = data.Where(entry => entry.name == ovr);
+            
+            foreach (var (key, value, extra) in data)
+            {
+                var row = table.AddRow()
+                    .SetData(colName, key)
+                    .SetData(colValue, value);
+                if (colExtra != null && !string.IsNullOrEmpty(extra))
+                    row.SetData(colExtra, extra);
+            }
+
+            Console.Write(table);
+        }
+
+        private static void HandleSetConfig(SetCommand cmd)
+        {
+            if (editTarget is not string && cmd.Variable is null)
+                throw new Exception("'get' not supported by target " + editTarget);
+
+            var key = cmd.Variable ?? editTarget as string ?? throw new Exception("No key defined");
+            var value = (editTarget as string == key ? cmd.Variable : cmd.Value) ??
+                        throw new Exception("No value found");
+            Config.Entries[key].Set(value);
+            SaveConfig();
+
+            Console.WriteLine($"Config variable '{key}' was set to '{value}'");
+        }
+
+        private static void HandleUnsetConfig(UnsetCommand cmd)
+        {
+            if (editTarget is not string && cmd.Variable is null)
+                throw new Exception("'get' not supported by target " + editTarget);
+
+            var key = cmd.Variable ?? editTarget as string ?? throw new Exception("No key defined");
+            var entry = Config.Entries[key];
+            entry.Value = entry.DefaultValue;
+            SaveConfig();
+
+            Console.WriteLine($"Config variable '{key}' was reset to '{entry.DefaultValue}'");
+        }
+
+        private static void HandleAddConfig(AddCommand cmd)
+        {
+            switch (editTarget)
+            {
+                case EditCommand.TargetType.package:
+                    // add unit package
+                    if (cmd.Target is not { } name0)
+                        throw new Exception("No package name provided");
+                    var insert0 = new UnitPackage(name0);
+                    editTarget = unitPackages[name0] = insert0;
+                    insert0.Save();
+                    Console.WriteLine($"Unit Package {name0} was created");
+                    break;
+                case UnitPackage pkg:
+                    if (cmd.Target is not { } id1)
+                        throw new Exception("No Unit ID provided");
+                    if (cmd.Value is not { } name1)
+                        throw new Exception("No Unit Name provided");
+                    var insert1 = new Unit(pkg, name1, id1);
+                    editTarget = pkg.values[id1] = insert1;
+                    insert1.Save();
+                    Console.WriteLine($"Unit {insert1.Name} added to package {pkg.Name}");
+                    break;
+                case Unit unit:
+                    if (cmd.Target is not { } equ)
+                        throw new Exception("No equation provided");
+                    unit.Package.ParseEquations(new AntlrInputStream(equ), unit);
+                    unit.Package.Finalize(Current);
+                    unit.Save();
+                    Console.WriteLine($"Equation '{equ}' was added to unit {unit}");
+                    break;
+                default:
+                    throw new Exception("'add' not supported by target " + editTarget);
+            }
+        }
+
+        private static void HandleRemoveConfig(RemoveCommand cmd)
+        {
+            bool NotConfirmed(string task)
+            {
+                Console.Write($"Warning: Do you really want to {task}? This action cannot be undone. [y/n] ");
+                return Console.Read() != 'y';
+            }
+
+            void Delete(Unit unit) => File.Delete(unit.Path);
+
+            switch (editTarget)
+            {
+                case UnitPackage pkg:
+                    if (NotConfirmed("delete package " + pkg.Name))
+                        return;
+                    if (unitPackages.Remove(pkg.Name, out _))
+                    {
+                        foreach (var unit in pkg.values.Values)
+                            Delete(unit);
+                        Directory.Delete(pkg.Path);
+                        Console.WriteLine($"Unit Package {pkg.Name} was removed");
+                    }
+                    else throw new Exception($"Package {pkg} could not be removed");
+                    break;
+                case Unit unit:
+                    if (cmd.Target is { } key)
+                    { // remove equation
+                        throw new NotImplementedException("Cannot remove equations in code yet");
+                    }else
+                    { // remove unit
+                        if (NotConfirmed("delete unit " + unit.Name))
+                            return;
+                        if (unit.Package.values.Remove(unit.Repr, out _))
+                        {
+                            Delete(unit);
+                            Console.WriteLine($"Unit {unit} was removed");
+                        }
+                        else throw new Exception($"Unit {unit} could not be removed");
+                    }
+                    break;
+                default:
+                    throw new Exception("'add' not supported by target " + editTarget);
+            }
         }
 
         private static void HandleClear(ClearCommand cmd)
@@ -870,18 +1075,6 @@ namespace clmath
             var name = cmd.Target;
             File.Delete(Path.Combine(dir, name + FuncExt));
             Console.WriteLine($"Function {name} deleted");
-        }
-
-        private static void HandleEnable(EnableCommand cmd)
-        {
-            if (Current.EnabledUnitPacks.Add(cmd.Target))
-                Console.WriteLine("Enabled unit pack " + cmd.Target);
-        }
-
-        private static void HandleDisable(DisableCommand cmd)
-        {
-            if (Current.EnabledUnitPacks.Remove(cmd.Target))
-                Console.WriteLine("Disabled unit pack " + cmd.Target);
         }
 
         private static void HandleMode(ModeCommand cmd)
@@ -970,8 +1163,9 @@ namespace clmath
         private readonly Column ColValue;
         public readonly List<Entry> Values = new();
 
-        public MultiEntryTable() : base(true, LineMode.Unicode)
+        public MultiEntryTable()
         {
+            Lines = Program.LineMode;
             ColTerm = AddColumn("Term");
             ColValue = AddColumn("Value");
         }

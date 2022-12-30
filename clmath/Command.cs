@@ -63,52 +63,11 @@ namespace clmath
         public TargetType Target { get; set; }
     }
 
-    [Verb("set", HelpText = "Define a constant value")]
-    public class SetCommand : IVariableCmd<string>, IAcceptValueCmd<string>
-    {
-        public string Value { get; set; }
-        public bool Verbose { get; set; }
-        public string Variable { get; set; }
-    }
-
-    [Verb("unset", HelpText = "Remove a constant value")]
-    public class UnsetCommand : IVariableCmd<string>
-    {
-        public bool Verbose { get; set; }
-        public string Variable { get; set; }
-    }
-
     [Verb("mode", HelpText = "DRG Mode to use for calculation")]
     public class ModeCommand : ITargetCmd<CalcMode>
     {
         public bool Verbose { get; set; }
         public CalcMode Target { get; set; }
-    }
-
-    [Verb("edit", HelpText = "Edit configuration")]
-    public class EditCommand : ITargetCmd<EditCommand.TargetType>
-    {
-        public enum TargetType
-        {
-            unit
-        }
-
-        public bool Verbose { get; set; }
-        public TargetType Target { get; set; }
-    }
-
-    [Verb("enable", HelpText = "Enable a feature")]
-    public class EnableCommand : ITargetCmd<string>
-    {
-        public bool Verbose { get; set; }
-        public string Target { get; set; }
-    }
-
-    [Verb("disable", HelpText = "Disable a feature")]
-    public class DisableCommand : ITargetCmd<string>
-    {
-        public bool Verbose { get; set; }
-        public string Target { get; set; }
     }
 
     #endregion
@@ -140,7 +99,7 @@ namespace clmath
         public string Target { get; set; }
     }
 
-    [Verb("delete", HelpText = "Rename a function")]
+    [Verb("delete", HelpText = "Delete a function")]
     public class DeleteCommand : ITargetCmd<string>
     {
         public bool Verbose { get; set; }
@@ -191,6 +150,64 @@ namespace clmath
         public bool Verbose { get; set; }
     }
 
+    #endregion
+
+    #region Config Related
+
+    [Verb("edit", aliases: new[]{"config"}, HelpText = "Edit configuration")]
+    public class EditCommand : ITargetCmd<EditCommand.TargetType>, IAcceptValueCmd<string>
+    {
+        public enum TargetType
+        {
+            config,
+            package,
+            unit
+        }
+
+        public bool Verbose { get; set; }
+        public TargetType Target { get; set; }
+        public string? Value { get; set; }
+    }
+
+    [Verb("get", HelpText = "Get a value")]
+    public class GetCommand : IVariableCmd<string>, IAcceptValueCmd<string>
+    {
+        public string? Value { get; set; }
+        public bool Verbose { get; set; }
+        public string? Variable { get; set; }
+    }
+
+    [Verb("set", HelpText = "Set a value")]
+    public class SetCommand : IVariableCmd<string>, IAcceptValueCmd<string>
+    {
+        public string? Value { get; set; }
+        public bool Verbose { get; set; }
+        public string? Variable { get; set; }
+    }
+
+    [Verb("unset", HelpText = "Unset a value")]
+    public class UnsetCommand : IVariableCmd<string>
+    {
+        public bool Verbose { get; set; }
+        public string? Variable { get; set; }
+    }
+    
+    [Verb("add", HelpText = "Add a value to a target")]
+    public class AddCommand : ITargetCmd<string>, IAcceptValueCmd<string>
+    {
+        public string Value { get; set; }
+        public bool Verbose { get; set; }
+        public string Target { get; set; }
+    }
+    
+    [Verb("remove", HelpText = "Remove a value to a target")]
+    public class RemoveCommand : ITargetCmd<string>, IAcceptValueCmd<string>
+    {
+        public string Value { get; set; }
+        public bool Verbose { get; set; }
+        public string Target { get; set; }
+    }
+    
     #endregion
 
     #region Tools
