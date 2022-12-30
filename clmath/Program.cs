@@ -343,7 +343,7 @@ namespace clmath
             if (bindings.FirstOrDefault((entry) => entry.Key.IsInstanceOfType(result.Value)) is {Key: not null, Value: not null} pair)
                 WithExceptionHandler<ICmd>(HandleException, (cmd) => pair.Value(cmd))((result.Value as ICmd)!);
             else if (fallback != null && result.Errors.All(e => e.Tag == ErrorType.BadVerbSelectedError))
-                fallback(input);
+                WithExceptionHandler(HandleException, fallback)(input);
         }
 
         private static void HandleParseErrors(IEnumerable<Error> obj, ParserResult<object> parserResult, Type[] types, bool skipOnBadVerb)
