@@ -140,6 +140,7 @@ namespace clmath
             }
         }
 
+        [RegexPattern]
         private static readonly string OldDescriptorPattern = "([pq]):\\s(\\w+),(\\w+)";
 
         private static string MigrateUnitFile(string unitFile)
