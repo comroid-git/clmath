@@ -228,7 +228,7 @@ namespace clmath
                 }
                 else
                 {
-                    EvalMode(new MathContext(BaseContext, ParseFunc(File.ReadAllText(input))));
+                    EvalMode();
                     Console.WriteLine("Press any key to exit...");
                     Console.ReadLine();
                 }
@@ -269,14 +269,14 @@ namespace clmath
                 {
                     var ctx = new MathContext(Current, ParseFunc(func));
                     Stack.Push(ctx);
-                    EvalMode(ctx);
+                    EvalMode();
                 });
             }
         }
 
-        private static void EvalMode(MathContext ctx)
+        private static void EvalMode()
         {
-            var func = ctx.Function;
+            var func = Current.Function;
             if (func.GetVars().Distinct().All(constants.ContainsKey))
             {
                 var res = func.Evaluate(new MathContext(BaseContext));
@@ -285,11 +285,10 @@ namespace clmath
             }
             else
             {
-                var cc = 0;
                 // enter editor mode
                 while (!(Current.Root || _exiting))
                 {
-                    func = Current.function;
+                    func = Current.Function;
                     Console.Title = $"[{DRG}] {func}";
                     Console.Write($"{func}> ");
                     var input = Console.ReadLine()!;
@@ -301,9 +300,9 @@ namespace clmath
                             Console.WriteLine($"Error: Variable {key} cannot use itself");
                         else if (constants.ContainsKey(key))
                             Console.WriteLine($"Error: Cannot redefine {key}");
-                        else ctx[key] = value;
+                        else Current[key] = value;
 
-                        if (AutoEval && FindMissingVariables(func, ctx).Count == 0)
+                        if (AutoEval && FindMissingVariables(func, Current).Count == 0)
                             HandleEval();
                     }
                     else
@@ -841,7 +840,7 @@ namespace clmath
         {
             var ctx = LoadFunc(cmd.Target)!;
             Stack.Push(ctx);
-            EvalMode(ctx);
+            EvalMode();
         }
 
         private static void HandleSave(SaveCommand cmd)
