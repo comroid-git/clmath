@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Antlr4.Runtime;
 using clmath.Antlr;
@@ -77,7 +78,8 @@ namespace clmath
                     return result;
                 },
                 () => TextTable.LineMode.Unicode
-            }
+            },
+            { "enabled", str => JsonSerializer.Deserialize<string[]>(str), Array.Empty<string> }
         };
 
         public static CalcMode DRG
@@ -212,6 +214,7 @@ namespace clmath
 
         private static void SaveConfig()
         {
+            Config.Entries["enabled"].Value = BaseContext.EnabledUnitPacks.ToArray();
             Config.Save(configFile);
         }
 
@@ -220,6 +223,9 @@ namespace clmath
             try
             {
                 Config.Load(configFile);
+                BaseContext.EnabledUnitPacks.Clear();
+                foreach (var pack in Config.Get<string[]>("enabled")!)
+                    BaseContext.EnabledUnitPacks.Add(pack);
             }
             catch
             {
@@ -953,7 +959,16 @@ namespace clmath
                     Console.WriteLine($"Equation '{equ}' was added to unit {unit}");
                     break;
                 default:
-                    throw new Exception("'add' not supported by target " + editTarget);
+                    if (cmd.Target is not { } name3)
+                        throw new Exception("No array name provided");
+                    if (cmd.Value is not { } value3)
+                        throw new Exception("No value provided");
+                    var entry = Config.Entries[name3];
+                    if (!entry.Type.IsArray || !typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
+                        throw new Exception("Variable is not string[]");
+                    entry.Value = (entry.Value as string[])!.Append(value3).ToArray();
+                    SaveConfig();
+                    break;
             }
         }
 
@@ -998,7 +1013,16 @@ namespace clmath
                     }
                     break;
                 default:
-                    throw new Exception("'add' not supported by target " + editTarget);
+                    if (cmd.Target is not { } name3)
+                        throw new Exception("No array name provided");
+                    if (cmd.Value is not { } value3)
+                        throw new Exception("No value provided");
+                    var entry = Config.Entries[name3];
+                    if (!entry.Type.IsArray || typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
+                        throw new Exception("Variable is not string[]");
+                    entry.Value = (entry.Value as string[])!.Where(it => it != value3).ToArray();
+                    SaveConfig();
+                    break;
             }
         }
 
