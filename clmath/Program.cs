@@ -968,7 +968,7 @@ namespace clmath
                     var entry = Config.Entries[name3];
                     if (!entry.Type.IsArray || !typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
                         throw new Exception("Variable is not string[]");
-                    entry.Value = (entry.Value as string[])!.Append(value3).ToArray();
+                    Current.EnabledUnitPacks.Add(value3);
                     SaveConfig();
                     break;
             }
@@ -1022,7 +1022,7 @@ namespace clmath
                     var entry = Config.Entries[name3];
                     if (!entry.Type.IsArray || typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
                         throw new Exception("Variable is not string[]");
-                    entry.Value = (entry.Value as string[])!.Where(it => it != value3).ToArray();
+                    Current.EnabledUnitPacks.Remove(value3);
                     SaveConfig();
                     break;
             }
