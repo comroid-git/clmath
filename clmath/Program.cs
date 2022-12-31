@@ -825,6 +825,7 @@ namespace clmath
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown list Target");
             }
+            data = data.OrderBy(entry => entry.id.ToString()!, Comparer<string>.Default);
 
             var colId = table.AddColumn(colIdText);
             var colData = table.AddColumn(colDataText);
@@ -885,6 +886,7 @@ namespace clmath
                     data = Config.Entries.Select(entry => (entry.Key, entry.Value.ConvertOutput(), entry.Value.Type.FullName!));
                     break;
             }
+            data = data.OrderBy(entry => entry.name.ToString()!, Comparer<string>.Default);
             if ((cmd.Variable ?? editTarget as string) is { } ovr)
                 data = data.Where(entry => entry.name == ovr);
             
