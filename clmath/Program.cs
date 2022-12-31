@@ -310,7 +310,7 @@ namespace clmath
         private static void EvalMode()
         {
             var func = Current.Function;
-            if (func.GetVars().Distinct().All(constants.ContainsKey))
+            if (func.Vars().Distinct().All(constants.ContainsKey))
             {
                 var res = func.Evaluate(new MathContext(BaseContext));
                 PrintResult(func, res, BaseContext, false);
@@ -329,7 +329,7 @@ namespace clmath
                     {
                         var key = equ.key;
                         var value = equ.value;
-                        if (value.GetVars().Contains(key))
+                        if (value.Vars().Contains(key))
                             Console.WriteLine($"Error: Variable {key} cannot use itself");
                         else if (constants.ContainsKey(key))
                             Console.WriteLine($"Error: Cannot redefine {key}");
@@ -571,7 +571,7 @@ namespace clmath
             foreach (var var in ctx.Vars()
                          .Select(x => x.Value)
                          .Append(func)
-                         .SelectMany(it => it.GetVars())
+                         .SelectMany(it => it.Vars())
                          .Distinct())
                 if (ctx.Vars().All(x => x.Key != var))
                     missing.Add(var);
@@ -620,7 +620,13 @@ namespace clmath
             if (!printOnly)
             {
                 if (amend) entry.Values.Clear();
-                ctx.DumpVariables(entry, shouldError, key => func.EnumerateVars().Contains(key));
+                ctx.DumpVariables(entry, shouldError, key => func.Vars()
+                    .SelectMany(name =>
+                    {
+                        if (Current.Vars().FirstOrDefault(var => var.Key == name).Value is { } comp)
+                            return comp.Vars();
+                        return new[] { name };
+                    }).Contains(key));
                 entry.Values.Add((func, result));
             }
 
@@ -772,6 +778,12 @@ namespace clmath
 
         private static void HandleList(ListCommand cmd)
         {
+            if (cmd.Target == ListCommand.TargetType.results)
+            {
+                Console.Clear();
+                Console.Write(results);
+                return;
+            }
             var table = new TextTable { Lines = LineMode };
             string colIdText = "Name", colDataText = "Value";
             IEnumerable<(object id, object obj)> data;
@@ -779,7 +791,18 @@ namespace clmath
             switch (cmd.Target)
             {
                 case ListCommand.TargetType.vars:
-                    data = Current.Vars().Select(entry => ((object)entry.Key, (object)entry.Value));
+                    data = Current.Vars().Concat((Current.function?.Vars() ?? ArraySegment<string>.Empty)
+                        .SelectMany(name =>
+                        {
+                            if (Current.Vars().FirstOrDefault(var => var.Key == name).Value is { } comp)
+                                return comp.Vars();
+                            return new[] { name };
+                        })
+                        .Select(name => new KeyValuePair<string, Component>(name,
+                            new Component() { type = Component.Type.EvalVar, arg = "unset" })))
+                        .DistinctBy(entry => entry.Key)
+                        .Where(entry => !constants.ContainsKey(entry.Key))
+                        .Select(entry => ((object)entry.Key, (object)entry.Value));
                     break;
                 case ListCommand.TargetType.func:
                     colDataText = "Term";
@@ -1030,41 +1053,20 @@ namespace clmath
 
         private static void HandleClear(ClearCommand cmd)
         {
-            var ClearVars = Current.ClearVars;
-            var ClearMemory = Current.ClearMem;
-            var ClearStash = stash.Clear;
-            var ClearResults = results.Values.Clear;
-            var ClearStack = () =>
+            if ((cmd.Target & ClearCommand.TargetType.screen) != 0) 
+                Console.Clear();
+            if ((cmd.Target & ClearCommand.TargetType.vars) != 0) 
+                Current.ClearVars();
+            if ((cmd.Target & ClearCommand.TargetType.mem) != 0)
+                Current.ClearMem();
+            if ((cmd.Target & ClearCommand.TargetType.stash) != 0)
+                stash.Clear();
+            if ((cmd.Target & ClearCommand.TargetType.results) != 0)
+                results.Values.Clear();
+            if ((cmd.Target & ClearCommand.TargetType.stack) != 0)
             {
                 Stack.Clear();
                 Stack.Push(BaseContext);
-            };
-            switch (cmd.Target)
-            {
-                case ClearCommand.TargetType.vars:
-                    ClearVars();
-                    break;
-                case ClearCommand.TargetType.mem:
-                    ClearMemory();
-                    break;
-                case ClearCommand.TargetType.stash:
-                    ClearStash();
-                    break;
-                case ClearCommand.TargetType.stack:
-                    ClearStack();
-                    break;
-                case ClearCommand.TargetType.results:
-                    ClearResults();
-                    break;
-                case ClearCommand.TargetType.all:
-                    ClearVars();
-                    ClearMemory();
-                    ClearStash();
-                    ClearStack();
-                    ClearResults();
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(cmd.Target), cmd.Target, "Unknown clear Target");
             }
         }
 
@@ -1127,7 +1129,7 @@ namespace clmath
             var missing = FindMissingVariables(func, ctx);
             if (missing.Count > 0)
             {
-                DumpVariables(ctx, includeVar: key => func.EnumerateVars().Contains(key));
+                DumpVariables(ctx, includeVar: key => func.Vars().Contains(key));
                 Console.WriteLine(
                     $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
             }
@@ -1142,7 +1144,7 @@ namespace clmath
             var ctx = cmd.Function == null ? Current : CreateArgsFuncs(0, cmd.Function)[0];
             var lhs = new Component { type = Component.Type.Var, arg = cmd.LHS };
             var target = cmd.For;
-            var count = ctx.Function.GetVars().Count(x => x == target);
+            var count = ctx.Function.Vars().Count(x => x == target);
             if (count == 0)
             {
                 Console.WriteLine($"Error: Variable {target} was not found in function");
@@ -1164,7 +1166,7 @@ namespace clmath
             _graph?.Dispose();
             _graph = new Graph(Stack
                 .Where(ctx => ctx.function != null
-                              && ctx.Function.GetVars().Count(var => !constants.ContainsKey(var)) == 1 
+                              && ctx.Function.Vars().Count(var => !constants.ContainsKey(var)) == 1 
                               && ctx.Vars().All(pair => globalConstants.ContainsKey(pair.Key)))
                 .Concat(CreateArgsFuncs(0, new[]
                 {

@@ -250,26 +250,21 @@ namespace clmath
         public object? arg { get; set; }
         public Component[] args { get; set; }
 
-        public List<string> EnumerateVars()
+        public IEnumerable<string> Vars()
         {
             if (type == Type.Var)
                 return new List<string> { (arg as string)! };
-            List<string> vars = new();
+            IEnumerable<string> vars = Array.Empty<string>();
             if (type == Type.Eval)
             {
-                Program.LoadFunc(arg!.ToString()!)?.function?.GetVars().ForEach(vars.Add);
+                vars = vars.Concat(Program.LoadFunc(arg!.ToString()!)?.function?.Vars() 
+                                   ?? Array.Empty<string>());
                 foreach (var arg in args)
-                    vars.Add(arg.arg!.ToString()!);
+                    vars = vars.Append(arg.arg!.ToString()!);
             }
 
-            x?.GetVars().ForEach(vars.Add);
-            y?.GetVars().ForEach(vars.Add);
-            return vars;
-        }
-
-        public List<string> GetVars()
-        {
-            return EnumerateVars().Distinct().ToList();
+            return vars.Concat(x?.Vars() ?? Array.Empty<string>())
+                .Concat(y?.Vars() ?? Array.Empty<string>());
         }
 
         public UnitResult Evaluate(MathContext? ctx)
@@ -439,8 +434,10 @@ namespace clmath
                     return $"{x}{arg ?? string.Empty}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
                 case Type.Equation:
                     return $"{x} = {y}";
+                case Type.EvalVar:
+                    return arg?.ToString() ?? "null";
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(type));
+                    throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported type");
             }
         }
 

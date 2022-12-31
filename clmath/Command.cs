@@ -12,19 +12,19 @@ namespace clmath
 
     public interface IVariableCmd<T> : ICmd
     {
-        [Value(0, MetaName = "Variable", Required = false, Default = null, HelpText = "The variable to work with")]
+        [Value(0, MetaName = "Variable", Required = false, Default = default, HelpText = "The variable to work with")]
         public T? Variable { get; set; }
     }
 
     public interface ITargetCmd<T> : ICmd
     {
-        [Value(0, MetaName = "Target", Required = false, Default = null, HelpText = "The target to use")]
+        [Value(0, MetaName = "Target", Required = false, Default = default, HelpText = "The target to use")]
         public T? Target { get; set; }
     }
 
     public interface IAcceptValueCmd<T> : ICmd
     {
-        [Value(1, MetaName = "Value", Required = false, Default = null, HelpText = "The new value")]
+        [Value(1, MetaName = "Value", Required = false, Default = default, HelpText = "The new value")]
         public T? Value { get; set; }
     }
 
@@ -49,6 +49,7 @@ namespace clmath
         public enum TargetType
         {
             vars = default,
+            results,
             func,
             constant,
             stack,
@@ -109,14 +110,16 @@ namespace clmath
     [Verb("clear", HelpText = "Clear things by category")]
     public class ClearCommand : ITargetCmd<ClearCommand.TargetType>
     {
-        public enum TargetType
+        [Flags]
+        public enum TargetType : byte
         {
-            vars = default,
-            mem,
-            stash,
-            stack,
-            results,
-            all
+            screen = 1<<1,
+            vars = 1<<2,
+            mem = 1<<3,
+            stash = 1<<4,
+            stack = 1<<5,
+            results = 1<<6,
+            all = 255
         }
 
         public bool Verbose { get; set; }

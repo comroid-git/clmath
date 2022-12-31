@@ -128,11 +128,8 @@ namespace clmath
             return Normalize(prefix ?? SiPrefix.None).Value;
         }
 
-        public override string ToString()
-        {
-            return Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) +
-                   (Unit.ToString() == string.Empty ? string.Empty : $"{Unit}");
-        }
+        public override string ToString() =>
+            Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) + Unit.Repr;
     }
 
     public abstract class AbstractUnit
