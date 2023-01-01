@@ -129,7 +129,7 @@ namespace clmath
         }
 
         public override string ToString() =>
-            Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) + Unit.Repr;
+            Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) + Unit;
     }
 
     public abstract class AbstractUnit
@@ -203,7 +203,7 @@ namespace clmath
 
         public override string ToString()
         {
-            return $"{Prefix}{Unit}";
+            return $"{Prefix}{Unit.Repr}";
         }
 
         protected internal override Unit AsUnit(MathContext? ctx = null)
