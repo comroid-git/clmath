@@ -454,7 +454,7 @@ namespace clmath
                 case Type.Parentheses:
                     return $"({x})";
                 case Type.Unit:
-                    return $"{x}{(arg != null ? $"\\text{{{arg}}}" : string.Empty)}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
+                    return $"{x}{(arg != null ? output == OutputType.LaTeX ? $"\\text{{{arg}}}" : arg.ToString() : string.Empty)}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
                 case Type.Equation:
                     return $"{x} {(output == OutputType.LaTeX ? "&" : "")}= {y}";
                 case Type.EvalVar:
