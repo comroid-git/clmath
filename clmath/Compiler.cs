@@ -391,39 +391,62 @@ namespace clmath
             return ctx == null || arg == null ? null : new SiUnit((string)arg!, ctx.GetUnitPackages());
         }
 
-        public override string ToString()
+        public enum OutputType
+        {
+            Text = default,
+            LaTeX
+        }
+
+        public override string ToString() => ToString(Program.Output);
+        public string ToString(OutputType output)
         {
             switch (type)
             {
                 case Type.Num:
                     return (arg as double?)?.ToString("0." + new string('#', 15))!;
                 case Type.Var:
-                    return arg?.ToString()!;
+                    return output switch
+                    {
+                        OutputType.LaTeX => $"\\text{{{arg}}}",
+                        _ => arg?.ToString()!
+                    };
                 case Type.Mem:
                     return "mem" + (x == null ? string.Empty : $"[{x}]");
                 case Type.FuncX:
-                    return $"{func.ToString()!.ToLower()}({x})";
+                    return (output == OutputType.LaTeX ? '\\' : string.Empty) + $"{func.ToString()!.ToLower()}({x})";
                 case Type.Factorial:
                     return $"{x}!";
                 case Type.Root:
                     var n = y?.ToString() ?? "2";
-                    return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x})";
+                    switch (output)
+                    {
+                        case OutputType.LaTeX:
+                            return "\\sqrt" + (n == "2" ? string.Empty : $"[{n}]") + $"{{{x}}}";
+                        default:
+                            return $"{(n == "2" ? "sqrt" : $"root[{n}]")}({x})";
+                    }
                 case Type.Abs:
                     return $"|{x}|";
                 case Type.Frac:
-                    return $"frac({x})({y})";
-                case Type.Op:
-                    var op = this.op switch
+                    return output switch
                     {
-                        Operator.Add => '+',
-                        Operator.Subtract => '-',
-                        Operator.Multiply => '*',
-                        Operator.Divide => '/',
-                        Operator.Modulus => '%',
-                        Operator.Power => '^',
+                        OutputType.LaTeX => $"\\frac{{{x}}}{{{y}}}",
+                        _ => $"frac({x})({y})"
+                    };
+                case Type.Op:
+                    return (this.op, output) switch
+                    {
+                        (Operator.Add, _) => $"{x}+{y}",
+                        (Operator.Subtract, _) => $"{x}-{y}",
+                        (Operator.Multiply, OutputType.LaTeX) => $"{x}\\cdot{y}",
+                        (Operator.Multiply, _) => $"{x}*{y}",
+                        (Operator.Divide, OutputType.LaTeX) => $"\\frac{{{x}}}{{{y}}}",
+                        (Operator.Divide, _) => $"{x}/{y}",
+                        (Operator.Modulus, _) => $"{x}%{y}",
+                        (Operator.Power, OutputType.LaTeX) => $"{x}^{{{y}}}",
+                        (Operator.Power, _) => $"{x}^{y}",
                         _ => throw new ArgumentOutOfRangeException()
                     };
-                    return $"{x}{op}{y}";
                 case Type.Eval:
                     return $"${arg}" + (args.Length == 0
                         ? string.Empty
@@ -431,9 +454,9 @@ namespace clmath
                 case Type.Parentheses:
                     return $"({x})";
                 case Type.Unit:
-                    return $"{x}{arg ?? string.Empty}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
+                    return $"{x}{(arg != null ? $"\\text{{{arg}}}" : string.Empty)}{(this.op == Operator.Modulus ? "?" : string.Empty)}";
                 case Type.Equation:
-                    return $"{x} = {y}";
+                    return $"{x} {(output == OutputType.LaTeX ? "&" : "")}= {y}";
                 case Type.EvalVar:
                     return arg?.ToString() ?? "null";
                 default:

@@ -79,6 +79,14 @@ namespace clmath
                 },
                 () => TextTable.LineMode.Unicode
             },
+            {
+                "output", key =>
+                {
+                    Enum.TryParse<Component.OutputType>(key, out var result);
+                    return result;
+                },
+                () => Component.OutputType.Text
+            },
             { "enabled", str => JsonSerializer.Deserialize<string[]>(str), Array.Empty<string> }
         };
 
@@ -96,6 +104,12 @@ namespace clmath
         {
             get => Config.Get<TextTable.LineMode>("lineMode");
             set => Config["lineMode"] = value;
+        }
+
+        public static Component.OutputType Output
+        {
+            get => Config.Get<Component.OutputType>("output");
+            set => Config["output"] = value;
         }
 
         public static Dictionary<string, double> constants { get; private set; } = null!;
