@@ -638,7 +638,7 @@ namespace clmath
                     .SelectMany(name =>
                     {
                         if (Current.Vars().FirstOrDefault(var => var.Key == name).Value is { } comp)
-                            return comp.Vars();
+                            return comp.Vars().Append(name);
                         return new[] { name };
                     }).Contains(key));
                 entry.Values.Add((func, result));
