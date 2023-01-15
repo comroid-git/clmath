@@ -275,6 +275,7 @@ namespace clmath
                 }
                 else
                 {
+                    Stack.Push(new MathContext(BaseContext, ParseFunc(string.Join("", args))));
                     EvalMode();
                     Console.WriteLine("Press any key to exit...");
                     Console.ReadLine();
