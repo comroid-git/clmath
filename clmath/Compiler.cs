@@ -340,12 +340,12 @@ namespace clmath
                     switch (op)
                     {
                         case Operator.Add:
-                            return new UnitResult(x!.Unit,
-                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) +
+                            return new UnitResult(SiUnit.None, 
+                                SiPrefix.None.Convert(x!.Unit.Prefix, x.Value) +
                                 SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Subtract:
-                            return new UnitResult(x!.Unit,
-                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) -
+                            return new UnitResult(SiUnit.None,
+                                SiPrefix.None.Convert(x!.Unit.Prefix, x.Value) -
                                 SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
                         case Operator.Multiply:
                             return x!.Multiply(ctx!, y!).Normalize();
