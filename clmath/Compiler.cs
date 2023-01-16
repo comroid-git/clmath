@@ -294,16 +294,16 @@ namespace clmath
                     switch (func)
                     {
                         case FuncX.Sin:
-                            result = Math.Sin(Program.IntoDRG(x!.Value));
+                            result = Math.Sin(Program.IntoDRG(x!.ValueNeutralized));
                             break;
                         case FuncX.Cos:
-                            result = Math.Cos(Program.IntoDRG(x!.Value));
+                            result = Math.Cos(Program.IntoDRG(x!.ValueNeutralized));
                             break;
                         case FuncX.Tan:
-                            result = Math.Tan(Program.IntoDRG(x!.Value));
+                            result = Math.Tan(Program.IntoDRG(x!.ValueNeutralized));
                             break;
                         case FuncX.Log:
-                            result = Math.Log(x!.Value);
+                            result = Math.Log(x!.ValueNeutralized);
                             break;
                         case FuncX.Sec:
                         case FuncX.Csc:
@@ -311,13 +311,13 @@ namespace clmath
                         case FuncX.Hyp:
                             throw new NotImplementedException(func.ToString());
                         case FuncX.ArcSin:
-                            result = Program.FromDRG(Math.Asin(x!.Value));
+                            result = Program.FromDRG(Math.Asin(x!.ValueNeutralized));
                             break;
                         case FuncX.ArcCos:
-                            result = Program.FromDRG(Math.Acos(x!.Value));
+                            result = Program.FromDRG(Math.Acos(x!.ValueNeutralized));
                             break;
                         case FuncX.ArcTan:
-                            result = Program.FromDRG(Math.Atan(x!.Value));
+                            result = Program.FromDRG(Math.Atan(x!.ValueNeutralized));
                             break;
                         default: throw new Exception("invalid state");
                     }

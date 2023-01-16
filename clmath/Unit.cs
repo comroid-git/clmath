@@ -79,6 +79,7 @@ namespace clmath
         public static readonly UnitResult Zero = new(0);
         public readonly SiUnit Unit;
         public readonly double Value;
+        public double ValueNeutralized => SiPrefix.None.Convert(Unit.Prefix, Value);
 
         public UnitResult(double value) : this(SiUnit.None, value)
         {
