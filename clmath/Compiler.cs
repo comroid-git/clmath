@@ -1,6 +1,5 @@
 ﻿using Antlr4.Runtime.Tree;
 using clmath.Antlr;
-using comroid.csapi.common;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -198,7 +197,7 @@ namespace clmath
         }
     }
 
-    public sealed class Component : IByteContainer
+    public sealed class Component
     {
         public enum FuncX
         {
@@ -243,19 +242,12 @@ namespace clmath
             Equation
         }
 
-        [ByteData(0)]
         public Type type { get; set; }
-        [ByteData(1)]
         public FuncX? func { get; set; }
-        [ByteData(2)]
         public Operator? op { get; set; }
-        [ByteData(3)]
         public Component? x { get; set; }
-        [ByteData(4)]
         public Component? y { get; set; }
-        [ByteData(5)]
         public object? arg { get; set; }
-        //todo: support IEnumerable [ByteData(6)]
         public Component[] args { get; set; }
 
         public IEnumerable<string> Vars()
