@@ -1,5 +1,6 @@
 ﻿using Antlr4.Runtime.Tree;
 using clmath.Antlr;
+using comroid.csapi.common;
 
 // ReSharper disable once ArrangeNamespaceBody
 namespace clmath
@@ -197,7 +198,7 @@ namespace clmath
         }
     }
 
-    public sealed class Component
+    public sealed class Component : IByteContainer
     {
         public enum FuncX
         {
@@ -242,12 +243,19 @@ namespace clmath
             Equation
         }
 
+        [ByteData(0)]
         public Type type { get; set; }
+        [ByteData(1)]
         public FuncX? func { get; set; }
+        [ByteData(2)]
         public Operator? op { get; set; }
+        [ByteData(3)]
         public Component? x { get; set; }
+        [ByteData(4)]
         public Component? y { get; set; }
+        [ByteData(5)]
         public object? arg { get; set; }
+        //todo: support IEnumerable [ByteData(6)]
         public Component[] args { get; set; }
 
         public IEnumerable<string> Vars()
@@ -325,40 +333,33 @@ namespace clmath
                     return new UnitResult(SiUnit.None, result);
                 case Type.Factorial:
                     var yield = 1;
-                    for (var rem = (int)x!.Value; rem > 0; rem--)
+                    for (var rem = (int)x!.ValueNeutralized; rem > 0; rem--)
                         yield *= rem;
-                    return new UnitResult(x.Unit, yield).Normalize();
+                    return new UnitResult(SiUnit.None, yield).Normalize();
                 case Type.Root:
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
                     //return x!.Root(y);
-                    return new UnitResult(SiUnit.None, Math.Pow(x!.Value, 1 / (y?.Value ?? 2d))).Normalize();
+                    return new UnitResult(SiUnit.None, Math.Pow(x!.ValueNeutralized, 1 / (y?.ValueNeutralized ?? 2d))).Normalize();
                 case Type.Abs:
-                    return new UnitResult(x!.Unit, Math.Abs(x.Value)).Normalize();
+                    return new UnitResult(x!.Unit, Math.Abs(x.ValueNeutralized)).Normalize();
                 case Type.Frac:
                     return x!.Divide(ctx!, y!);
                 case Type.Op:
                     switch (op)
                     {
                         case Operator.Add:
-                            return new UnitResult(SiUnit.None, 
-                                SiPrefix.None.Convert(x!.Unit.Prefix, x.Value) +
-                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(SiUnit.None, x!.ValueNeutralized + y!.ValueNeutralized).Normalize();
                         case Operator.Subtract:
-                            return new UnitResult(SiUnit.None,
-                                SiPrefix.None.Convert(x!.Unit.Prefix, x.Value) -
-                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(SiUnit.None, x!.ValueNeutralized - y!.ValueNeutralized).Normalize();
                         case Operator.Multiply:
                             return x!.Multiply(ctx!, y!).Normalize();
                         case Operator.Divide:
                             return x!.Divide(ctx!, y!).Normalize();
                         case Operator.Modulus:
-                            return new UnitResult(x!.Unit,
-                                SiPrefix.None.Convert(x.Unit.Prefix, x.Value) %
-                                SiPrefix.None.Convert(y!.Unit.Prefix, y.Value)).Normalize();
+                            return new UnitResult(x!.Unit, x!.ValueNeutralized % y!.ValueNeutralized).Normalize();
                         case Operator.Power:
-                            return new UnitResult(x!.Unit,
-                                Math.Pow(x.Unit.Prefix.Convert(x.Unit.Prefix, x.Value),
-                                    y!.Unit.Prefix.Convert(x.Unit.Prefix, y.Value))).Normalize();
+                            return new UnitResult(x!.Unit, Math.Pow(x.ValueNeutralized, y!.ValueNeutralized))
+                                .Normalize();
                         case null: throw new Exception("invalid state");
                     }
 
