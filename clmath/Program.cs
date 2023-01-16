@@ -63,6 +63,7 @@ namespace clmath
         public static readonly ConfigBase Config = new()
         {
             { "autoEval", Convert.ToBoolean, () => true },
+            { "autoClear", Convert.ToBoolean, () => true },
             {
                 "drg", key =>
                 {
@@ -99,6 +100,11 @@ namespace clmath
         {
             get => Config.Get<bool>("autoEval");
             set => Config["autoEval"] = value;
+        }
+        public static bool AutoClear
+        {
+            get => Config.Get<bool>("autoClear");
+            set => Config["autoClear"] = value;
         }
         public static TextTable.LineMode LineMode
         {
@@ -652,7 +658,8 @@ namespace clmath
             }
             else
             {
-                Console.Clear();
+                if (AutoClear)
+                    Console.Clear();
                 Console.Write(results);
             }
         }
@@ -795,7 +802,8 @@ namespace clmath
         {
             if (cmd.Target == ListCommand.TargetType.results)
             {
-                Console.Clear();
+                if (AutoClear)
+                    Console.Clear();
                 Console.Write(results);
                 return;
             }
@@ -876,7 +884,8 @@ namespace clmath
                 Console.WriteLine("Nothing to display");
             else
             {
-                Console.Clear();
+                if (AutoClear)
+                    Console.Clear();
                 Console.Write(table);
             }
         }
