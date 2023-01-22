@@ -269,88 +269,93 @@ namespace clmath
 
         public UnitResult Evaluate(MathContext? ctx)
         {
-            var x = this.x?.Evaluate(ctx);
-            var y = this.y?.Evaluate(ctx);
-            switch (type, func, op)
+            UnitResult _()
             {
-                case (Type.Num, _, _):
-                    return new UnitResult((double)arg!);
-                case (Type.Var, _, _):
-                    if (arg is not string name)
-                        throw new Exception("Invalid arg: " + arg);
-                    if (name.StartsWith("rng"))
-                        if (name.EndsWith("i"))
-                            return new UnitResult(Program.RNG.Next()).Normalize();
-                        else if (name.EndsWith("d"))
-                            return new UnitResult(Program.RNG.NextDouble()).Normalize();
-                        else throw new Exception("Invalid random: " + arg);
-                    if (Program.constants.TryGetValue(name, out var val))
-                        return new UnitResult(val).Normalize();
-                    return ctx![name]!.Evaluate(ctx);
-                case (Type.Mem, _, _):
-                    return ctx![(int?)x?.Value ?? 0];
-                case (Type.FuncX, FuncX.Sin, _):
-                    return new UnitResult(SiUnit.None, Math.Sin(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, FuncX.Cos, _):
-                    return new UnitResult(SiUnit.None, Math.Cos(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, FuncX.Tan, _):
-                    return new UnitResult(SiUnit.None, Math.Tan(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, FuncX.Log, _):
-                    return new UnitResult(SiUnit.None, Math.Log(x!.ValueNeutralized));
-                case (Type.FuncX, FuncX.ArcSin, _):
-                    return new UnitResult(SiUnit.None, Math.Asin(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, FuncX.ArcCos, _):
-                    return new UnitResult(SiUnit.None, Math.Acos(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, FuncX.ArcTan, _):
-                    return new UnitResult(SiUnit.None, Math.Atan(Program.IntoDRG(x!.ValueNeutralized)));
-                case (Type.FuncX, _, _):
-                    throw new NotImplementedException(func.ToString());
-                case (Type.Factorial, _, _):
-                    var yield = 1;
-                    for (var rem = (int)x!.ValueNeutralized; rem > 0; rem--)
-                        yield *= rem;
-                    return new UnitResult(SiUnit.None, yield).Normalize();
-                case (Type.Root, _, _):
-                    // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    //return x!.Root(y);
-                    return new UnitResult(SiUnit.None, Math.Pow(x!.ValueNeutralized, 1 / (y?.ValueNeutralized ?? 2d)))
-                        .Normalize();
-                case (Type.Abs, _, _):
-                    return new UnitResult(x!.Unit, Math.Abs(x.ValueNeutralized)).Normalize();
-                case (Type.Op, _, Operator.Add):
                     return new UnitResult(SiUnit.None, x!.ValueNeutralized + y!.ValueNeutralized).Normalize();
-                case (Type.Op, _, Operator.Subtract):
                     return new UnitResult(SiUnit.None, x!.ValueNeutralized - y!.ValueNeutralized).Normalize();
-                case (Type.Op, _, Operator.Multiply):
-                    return x!.Multiply(ctx!, y!).Normalize();
-                case (Type.Frac, _, _):
-                case (Type.Op, _, Operator.Divide):
-                    return x!.Divide(ctx!, y!).Normalize();
-                case (Type.Op, _, Operator.Modulus):
-                    return new UnitResult(x!.Unit, x!.ValueNeutralized % y!.ValueNeutralized).Normalize();
-                case (Type.Op, _, Operator.Power):
-                    return new UnitResult(x!.Unit, Math.Pow(x.ValueNeutralized, y!.ValueNeutralized)).Normalize();
-                case (Type.Eval, _, _):
-                    if (Program.LoadFunc(arg!.ToString()!) is not { } res)
-                        return new UnitResult(SiUnit.None, double.NaN).Normalize();
-                    var subCtx = new MathContext(res);
-                    foreach (var (key, value) in ctx!.Vars())
-                        subCtx[key] = value;
-                    foreach (var var in args)
-                        subCtx[var.arg!.ToString()!] = var.x!;
-                    return res.function!.Evaluate(subCtx);
-                case (Type.Parentheses, _, _):
-                    return new UnitResult(x!.Unit, x.Value).Normalize();
-                case (Type.Unit, _, _):
-                    var unitResult =
-                        new UnitResult(arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()),
-                            x!.Value);
-                    if (op == Operator.Modulus)
-                        return unitResult.Normalize(SiPrefix.None);
-                    return unitResult.Normalize();
+                var x = this.x?.Evaluate(ctx);
+                var y = this.y?.Evaluate(ctx);
+                switch (type, func, op)
+                {
+                    case (Type.Num, _, _):
+                        return new UnitResult((double)arg!);
+                    case (Type.Var, _, _):
+                        if (arg is not string name)
+                            throw new Exception("Invalid arg: " + arg);
+                        if (name.StartsWith("rng"))
+                            if (name.EndsWith("i"))
+                                return new UnitResult(Program.RNG.Next());
+                            else if (name.EndsWith("d"))
+                                return new UnitResult(Program.RNG.NextDouble());
+                            else throw new Exception("Invalid random: " + arg);
+                        if (Program.constants.TryGetValue(name, out var val))
+                            return new UnitResult(val);
+                        return ctx![name]!.Evaluate(ctx);
+                    case (Type.Mem, _, _):
+                        return ctx![(int?)x?.Value ?? 0];
+                    case (Type.FuncX, FuncX.Sin, _):
+                        return new UnitResult(SiUnit.None, Math.Sin(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, FuncX.Cos, _):
+                        return new UnitResult(SiUnit.None, Math.Cos(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, FuncX.Tan, _):
+                        return new UnitResult(SiUnit.None, Math.Tan(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, FuncX.Log, _):
+                        return new UnitResult(SiUnit.None, Math.Log(x!.ValueNeutralized));
+                    case (Type.FuncX, FuncX.ArcSin, _):
+                        return new UnitResult(SiUnit.None, Math.Asin(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, FuncX.ArcCos, _):
+                        return new UnitResult(SiUnit.None, Math.Acos(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, FuncX.ArcTan, _):
+                        return new UnitResult(SiUnit.None, Math.Atan(Program.IntoDRG(x!.ValueNeutralized)));
+                    case (Type.FuncX, _, _):
+                        throw new NotImplementedException(func.ToString());
+                    case (Type.Factorial, _, _):
+                        var yield = 1;
+                        for (var rem = (int)x!.ValueNeutralized; rem > 0; rem--)
+                            yield *= rem;
+                        return new UnitResult(SiUnit.None, yield);
+                    case (Type.Root, _, _):
+                        // ReSharper disable once CompareOfFloatsByEqualityOperator
+                        //return x!.Root(y);
+                        return new UnitResult(SiUnit.None,
+                                Math.Pow(x!.ValueNeutralized, 1 / (y?.ValueNeutralized ?? 2d)))
+                            ;
+                    case (Type.Abs, _, _):
+                        return new UnitResult(x!.Unit, Math.Abs(x.ValueNeutralized));
+                    case (Type.Op, _, Operator.Add):
+                    case (Type.Op, _, Operator.Subtract):
+                    case (Type.Op, _, Operator.Multiply):
+                        return x!.Multiply(ctx!, y!);
+                    case (Type.Frac, _, _):
+                    case (Type.Op, _, Operator.Divide):
+                        return x!.Divide(ctx!, y!);
+                    case (Type.Op, _, Operator.Modulus):
+                        return new UnitResult(x!.Unit, x!.ValueNeutralized % y!.ValueNeutralized);
+                    case (Type.Op, _, Operator.Power):
+                        return new UnitResult(x!.Unit, Math.Pow(x.ValueNeutralized, y!.ValueNeutralized));
+                    case (Type.Eval, _, _):
+                        if (Program.LoadFunc(arg!.ToString()!) is not { } res)
+                            return new UnitResult(SiUnit.None, double.NaN);
+                        var subCtx = new MathContext(res);
+                        foreach (var (key, value) in ctx!.Vars())
+                            subCtx[key] = value;
+                        foreach (var var in args)
+                            subCtx[var.arg!.ToString()!] = var.x!;
+                        return res.function!.Evaluate(subCtx);
+                    case (Type.Parentheses, _, _):
+                        return new UnitResult(x!.Unit, x.Value);
+                    case (Type.Unit, _, _):
+                        var unitResult =
+                            new UnitResult(
+                                arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()),
+                                x!.Value);
+                        if (op == Operator.Modulus)
+                            return unitResult.Normalize(SiPrefix.None);
+                        return unitResult;
+                    default: throw new NotSupportedException(ToString());
+                }
             }
-
-            throw new NotSupportedException(ToString());
+            return _().Normalize();
         }
 
         internal SiUnit? ToUnit(MathContext? ctx)
