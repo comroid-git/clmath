@@ -166,6 +166,9 @@ namespace clmath
         {
             return Repr;
         }
+
+        public static bool operator ==(AbstractUnit? x, AbstractUnit? y) => x?.Repr == y?.Repr;
+        public static bool operator !=(AbstractUnit? x, AbstractUnit? y) => !(x == y);
     }
 
     public sealed class SiUnit : AbstractUnit
@@ -211,6 +214,8 @@ namespace clmath
         {
             return Unit.AsUnit(ctx);
         }
+
+        public static SiUnit operator %(SiUnit? x, SiUnit? y) => new SiUnit(SiPrefix.None, x!.Unit == y!.Unit ? x.Unit : None);
     }
 
     public sealed class Unit : AbstractUnit

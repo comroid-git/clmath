@@ -271,8 +271,6 @@ namespace clmath
         {
             UnitResult _()
             {
-                    return new UnitResult(SiUnit.None, x!.ValueNeutralized + y!.ValueNeutralized).Normalize();
-                    return new UnitResult(SiUnit.None, x!.ValueNeutralized - y!.ValueNeutralized).Normalize();
                 var x = this.x?.Evaluate(ctx);
                 var y = this.y?.Evaluate(ctx);
                 switch (type, func, op)
@@ -323,7 +321,9 @@ namespace clmath
                     case (Type.Abs, _, _):
                         return new UnitResult(x!.Unit, Math.Abs(x.ValueNeutralized));
                     case (Type.Op, _, Operator.Add):
+                        return new UnitResult(x?.Unit % y?.Unit, x!.ValueNeutralized + y!.ValueNeutralized);
                     case (Type.Op, _, Operator.Subtract):
+                        return new UnitResult(x?.Unit % y?.Unit, x!.ValueNeutralized - y!.ValueNeutralized);
                     case (Type.Op, _, Operator.Multiply):
                         return x!.Multiply(ctx!, y!);
                     case (Type.Frac, _, _):
