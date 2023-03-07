@@ -8,9 +8,9 @@ using Antlr4.Runtime;
 using clmath.Antlr;
 using CommandLine;
 using CommandLine.Text;
-using comroid.csapi.common;
+using comroid.common;
 using JetBrains.Annotations;
-using static comroid.csapi.common.DebugUtil;
+using static comroid.common.DebugUtil;
 using Parser = CommandLine.Parser;
 
 // ReSharper disable once ArrangeNamespaceBody
