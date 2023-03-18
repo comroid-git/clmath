@@ -348,7 +348,7 @@ namespace clmath
                         var unitResult =
                             new UnitResult(
                                 arg is not string str ? x!.Unit : new SiUnit(str ?? "", ctx!.GetUnitPackages()),
-                                x!.Value);
+                                x!.Value) | x;
                         if (op == Operator.Modulus)
                             return unitResult.Normalize(SiPrefix.None);
                         return unitResult;

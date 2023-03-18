@@ -129,6 +129,9 @@ namespace clmath
             return Normalize(prefix ?? SiPrefix.None).Value;
         }
 
+        public static UnitResult operator |(UnitResult x, UnitResult? y) => new UnitResult(
+            new SiUnit(y?.Unit.Prefix ?? x.Unit.Prefix, y?.Unit.Unit ?? x.Unit.Unit), y?.Value ?? x.Value);
+
         public override string ToString() =>
             Value.ToString("0." + new string('#', 14), CultureInfo.InvariantCulture) + Unit;
     }
