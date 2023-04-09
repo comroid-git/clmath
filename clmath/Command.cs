@@ -54,10 +54,7 @@ namespace clmath
             constant,
             stack,
             mem,
-            stash,
-            enabled,
-            packs,
-            units
+            stash
         }
 
         public bool Verbose { get; set; }
@@ -162,9 +159,7 @@ namespace clmath
     {
         public enum TargetType
         {
-            config,
-            package,
-            unit
+            config
         }
 
         public bool Verbose { get; set; }

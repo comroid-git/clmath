@@ -11,7 +11,7 @@ namespace clmath.test
         public const double Delta = 0.000_000_000_1d;
         public static readonly Random RNG = new();
 
-        public static UnitResult CalcTest(string input)
+        public static UnitValue CalcTest(string input)
         {
             Console.SetIn(new StringReader("\n"));
             Console.SetOut(new StringWriter());

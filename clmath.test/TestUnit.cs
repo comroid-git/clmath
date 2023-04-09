@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using comroid.common;
+using NUnit.Framework;
 
 namespace clmath.test
 {
@@ -13,14 +14,14 @@ namespace clmath.test
 
             // doesnt matter if these units are already defined; newer information just overrides
             const string packName = "electric";
-            var pack = Program.unitPackages[packName] = new UnitPackage(packName);
+            var pack = Program.unitCategorys[packName] = new UnitCategory(packName);
             var volts = pack.CreateOrGet(string.Empty, "V");
             var ampere = pack.CreateOrGet(string.Empty, "A");
             var watts = pack.CreateOrGet(string.Empty, "W");
             var hours = pack.CreateOrGet(string.Empty, "h");
             var wattHours = pack.CreateOrGet(string.Empty, "Wh");
-            UnitPackage.AddEval(volts, ampere, watts, Component.Operator.Multiply);
-            UnitPackage.AddEval(wattHours, hours, watts, Component.Operator.Divide);
+            UnitCategory.AddEval(volts, ampere, watts, Component.Operator.Multiply);
+            UnitCategory.AddEval(wattHours, hours, watts, Component.Operator.Divide);
             pack.Finalize(Program.BaseContext);
             Program.BaseContext.EnabledUnitPacks.Add(packName);
         }
