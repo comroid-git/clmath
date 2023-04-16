@@ -37,7 +37,6 @@ POW: '^';
 FACTORIAL: '!';
 FRAC: 'frac';
 MEM: 'mem';
-AS: 'as';
 
 PAR_L: '(';
 PAR_R: ')';
@@ -101,9 +100,10 @@ expr
     // grammarly late handlers
     | abs                           #exprAbs
     // unit handling
-    | expr AS unit=word             #exprUnitCast
+    | expr castKeyword unit=word    #exprUnitCast
     | expr QUESTION                 #exprUnitNormalize
 ;
+castKeyword: 'as' | 'in' | 'to';
 equation: lhs=expr EQUALS rhs=expr SEMICOLON;
 unitFile: .*? equation*;
 
