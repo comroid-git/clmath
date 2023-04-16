@@ -37,6 +37,7 @@ POW: '^';
 FACTORIAL: '!';
 FRAC: 'frac';
 MEM: 'mem';
+AS: 'as';
 
 PAR_L: '(';
 PAR_R: ')';
@@ -78,20 +79,30 @@ abs: ABS x=expr ABS;
 
 // expressions
 expr
-    : expr (unit=word|h=QUESTION|unit=word h=QUESTION)  #exprUnit
-    | x=expr POW y=expr                                 #exprPow
-    | l=expr op_1 r=expr                                #exprOp1
-    | PAR_L n=expr PAR_R                                #exprPar
-    | frac                                              #exprFrac
-    | fx                                                #exprFunc
-    | x=expr FACTORIAL                                  #exprFact
-    | root                                              #exprRoot
-    | abs                                               #exprAbs
-    | num                                               #exprNum
-    | MEM (IDX_L n=expr IDX_R)?                         #exprMem
-    | word                                              #exprId
-    | eval                                              #exprEval
-    | l=expr op_2 r=expr                                #exprOp2
+    // parentheses
+    : PAR_L n=expr PAR_R            #exprPar
+    // numbers
+    | num                           #exprNum
+    // unit application
+    | expr unit=word                #exprUnit
+    // math OPs
+    | x=expr POW y=expr             #exprPow
+    | l=expr op_1 r=expr            #exprOp1
+    | l=expr op_2 r=expr            #exprOp2
+    | frac                          #exprFrac
+    | fx                            #exprFunc
+    | x=expr FACTORIAL              #exprFact
+    | root                          #exprRoot
+    // variables
+    | MEM (IDX_L n=expr IDX_R)?     #exprMem
+    | word                          #exprId
+    // func evaluation
+    | eval                          #exprEval
+    // grammarly late handlers
+    | abs                           #exprAbs
+    // unit handling
+    | expr AS unit=word             #exprUnitCast
+    | expr QUESTION                 #exprUnitNormalize
 ;
 equation: lhs=expr EQUALS rhs=expr SEMICOLON;
 unitFile: .*? equation*;
