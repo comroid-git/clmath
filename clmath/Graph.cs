@@ -153,13 +153,13 @@ public sealed class Graph : IDisposable
 
         // vertex shader
         var shd_vtx = gl.CreateShader(ShaderType.VertexShader);
-        gl.ShaderSource(shd_vtx, File.ReadAllText(Path.Combine(AssemblyDir.FullName, "Assets", "vertex.glsl")));
+        gl.ShaderSource(shd_vtx, File.ReadAllText(Path.Combine(AssemblyDir.FullName, "Assets", "shader.vert")));
         gl.CompileShader(shd_vtx);
         gl.AttachShader(shaders, shd_vtx);
 
         // fragment shader
         var shd_frg = gl.CreateShader(ShaderType.FragmentShader);
-        gl.ShaderSource(shd_frg, File.ReadAllText(Path.Combine(AssemblyDir.FullName, "Assets", "fragment.glsl")));
+        gl.ShaderSource(shd_frg, File.ReadAllText(Path.Combine(AssemblyDir.FullName, "Assets", "shader.frag")));
         gl.CompileShader(shd_frg);
         gl.AttachShader(shaders, shd_frg);
 
