@@ -19,5 +19,5 @@ build() {
 }
 
 package() {
-    install -Dm755 "clmath/bin/Release/net6.0/linux-x64/publish/clmath" "$pkgdir/usr/bin/clmath"
+    install -Dm755 "clmath/clmath/bin/Release/net6.0/linux-x64/publish/clmath" "$pkgdir/usr/bin/clmath"
 }
