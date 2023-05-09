@@ -20,9 +20,5 @@ makepkg --printsrcinfo > .SRCINFO
 echo "build the executable"
 makepkg -f --noconfirm
 
-echo "show the current state"
-pwd
-tree
-
 echo "push to aur"
 git push --set-upstream aur master
