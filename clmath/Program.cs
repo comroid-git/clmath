@@ -273,7 +273,7 @@ public static class Program
             cfg.CaseSensitive = false;
             cfg.ParsingCulture = CultureInfo.InvariantCulture;
         });
-        ConfigVersion = FileVersionInfo.GetVersionInfo(typeof(Program).Assembly.Location).FileMajorPart;
+        ConfigVersion = FileVersionInfo.GetVersionInfo(AppContext.BaseDirectory).FileMajorPart;
         SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
