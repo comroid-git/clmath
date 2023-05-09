@@ -21,4 +21,4 @@ echo "build the executable"
 makepkg -f --noconfirm
 
 echo "push to aur"
-git push aur
+git push --set-upstream aur master
