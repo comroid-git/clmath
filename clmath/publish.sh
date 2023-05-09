@@ -15,7 +15,7 @@ dotnet test -c Test
 
 # update SRCINFO
 makepkg --printsrcinfo > .SRCINFO
-(git add .SRCINFO && git commit -m "SRCINFO") || (echo "Failed to commit .SRCINFO" >&2 | exit)
+(git add . && git commit -m "SRCINFO") || (echo "Failed to commit .SRCINFO" >&2 | exit)
 
 # build the executable
 makepkg -f --noconfirm
