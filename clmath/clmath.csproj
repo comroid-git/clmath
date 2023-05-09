@@ -3,31 +3,26 @@
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackageVersion>1.2.0</PackageVersion>
-        <Title>clmath</Title>
-        <Authors>comroid</Authors>
-        <Description>A commandline math tool</Description>
-        <PackageProjectUrl>https://github.com/comroid-git/clmath</PackageProjectUrl>
-        <PackageLicenseUrl>https://github.com/comroid-git/clmath/blob/master/LICENSE</PackageLicenseUrl>
-        <RepositoryUrl>https://github.com/comroid-git/clmath</RepositoryUrl>
-        <RepositoryType>git</RepositoryType>
-        <AssemblyVersion>1.3.0</AssemblyVersion>
+        <AssemblyVersion>1.3</AssemblyVersion>
         <FileVersion>10</FileVersion>
         <NeutralLanguage>en-150</NeutralLanguage>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>..\icon.ico</ApplicationIcon>
         <LangVersion>preview</LangVersion>
         <OutputType>Exe</OutputType>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>false</SelfContained>
         <TargetFramework>net6.0</TargetFramework>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1"/>
-        <PackageReference Include="Antlr4BuildTasks" Version="12.2.0" PrivateAssets="all"/>
-        <PackageReference Include="CommandLineParser" Version="2.9.1"/>
-        <PackageReference Include="Silk.NET.Input" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0"/>
+        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
+        <PackageReference Include="Antlr4BuildTasks" Version="12.2.0" PrivateAssets="all" />
+        <PackageReference Include="CommandLineParser" Version="2.9.1" />
+        <PackageReference Include="Silk.NET.Input" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -42,6 +37,12 @@
         <Content Include="Assets\**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Update="shader.frag">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Update="shader.vert">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -50,8 +51,12 @@
         </None>
     </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\..\csapi\common\common.csproj"/>
+    <ItemGroup Condition="Exists('..\..\csapi\common\common.csproj')">
+        <ProjectReference Include="..\..\csapi\common\common.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="!Exists('..\..\csapi\common\common.csproj')">
+        <PackageReference Include="comroid.csapi.common" Version="0.1.0" />
     </ItemGroup>
 
 </Project>
