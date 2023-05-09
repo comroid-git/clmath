@@ -9,8 +9,8 @@ url="https://github.com/comroid-git/clmath"
 license=('MIT')
 depends=('dotnet-runtime-6.0')
 makedepends=('dotnet-sdk-6.0')
-source=("git+https://github.com/comroid-git/clmath.git")
-md5sums=('SKIP')
+source=("git+https://github.com/comroid-git/clmath.git" "git+https://github.com/comroid-git/csapi.git")
+md5sums=('SKIP' 'SKIP')
 options+=("!strip")
 
 build() {
