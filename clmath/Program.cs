@@ -273,7 +273,7 @@ public static class Program
             cfg.CaseSensitive = false;
             cfg.ParsingCulture = CultureInfo.InvariantCulture;
         });
-        ConfigVersion = FileVersionInfo.GetVersionInfo(AppContext.BaseDirectory + "clmath.exe").FileMajorPart;
+        ConfigVersion = FileVersionInfo.GetVersionInfo(AppContext.BaseDirectory + "clmath" + (OperatingSystem.IsWindows() ? ".exe" : string.Empty)).FileMajorPart;
         SetUp();
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
