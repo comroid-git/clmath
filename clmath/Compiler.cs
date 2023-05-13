@@ -31,7 +31,7 @@ public class MathCompiler : MathBaseVisitor<Component>
         arg = context.unit?.GetText(),
         x = Visit(context.expr())
     };
-    
+
     public override Component VisitExprUnitNormalize(MathParser.ExprUnitNormalizeContext context) => new()
     {
         type = Component.Type.Unit,
@@ -384,7 +384,8 @@ public sealed class Component
             case Type.Parentheses:
                 return $"({x})";
             case Type.Unit:
-                return op switch {
+                return op switch
+                {
                     Operator.Multiply => $"{x}{(arg != null ? output == OutputType.LaTeX ? $"\\text{{{arg}}}" : arg.ToString() : string.Empty)}",
                     Operator.Modulus => $"{x} as {arg}",
                     Operator.Divide => $"{x}?",
