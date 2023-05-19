@@ -76,6 +76,8 @@ fx: func PAR_L x=expr PAR_R;
 root: ROOT i=idxExpr? PAR_L x=expr PAR_R;
 abs: ABS x=expr ABS;
 
+castKeyword: 'as' | 'in' | 'to';
+
 // expressions
 expr
     // parentheses
@@ -103,8 +105,7 @@ expr
     | expr castKeyword unit=word    #exprUnitCast
     | expr QUESTION                 #exprUnitNormalize
 ;
-castKeyword: 'as' | 'in' | 'to';
-equation: lhs=expr EQUALS rhs=expr SEMICOLON;
+equation: lhs=expr EQUALS rhs=expr SEMICOLON?;
 unitFile: .*? equation*;
 
 WS: [ \r\n\t] -> channel(HIDDEN);
