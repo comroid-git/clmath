@@ -16,6 +16,8 @@ namespace clmath;
 
 public static class Program
 {
+    public static readonly Log log = new("clmath");
+    
     public static void Main(params string[] args)
     {
         ParseInput(string.Join(" ", args), new Dictionary<Type, Action<ICmd>>
@@ -101,9 +103,9 @@ public static class Program
                     var key = equ.key;
                     var value = equ.value;
                     if (value.Vars().Contains(key))
-                        Console.WriteLine($"Error: Variable {key} cannot use itself");
+                        log.Error($"Variable {key} cannot use itself");
                     else if (constants.ContainsKey(key))
-                        Console.WriteLine($"Error: Cannot redefine {key}");
+                        log.Error($"Cannot redefine {key}");
                     else Current[key] = value;
 
                     if (AutoEval && FindMissingVariables(func, Current).Count == 0)
@@ -333,7 +335,7 @@ public static class Program
         }
         catch
         {
-            Console.WriteLine("Configuration could not be loaded; it was reset to defaults.");
+            log.Config("Configuration could not be loaded; it was reset to defaults.");
             return false;
         }
 
@@ -466,7 +468,7 @@ public static class Program
         var path = Path.Combine(dir, name + FuncExt);
         if (!File.Exists(path))
         {
-            Console.WriteLine($"Function with name {name} not found");
+            log.Error($"Function with name {name} not found");
             return null;
         }
 
@@ -533,7 +535,7 @@ public static class Program
         if (!ctx.Vars().Any())
         {
             if (shouldError)
-                Console.WriteLine("Error: No variables are set");
+                log.Error("No variables are set");
             return;
         }
 
@@ -979,8 +981,7 @@ public static class Program
         if (missing.Count > 0)
         {
             DumpVariables(ctx, includeVar: key => func.Vars().Contains(key));
-            Console.WriteLine(
-                $"Error: Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
+            log.Error($"Missing variable{(missing.Count != 1 ? "s" : "")} {string.Join(", ", missing)}");
         }
         else
         {
@@ -996,13 +997,13 @@ public static class Program
         var count = ctx.Function.Vars().Count(x => x == target);
         if (count == 0)
         {
-            Console.WriteLine($"Error: Variable {target} was not found in function");
+            log.Error($"Variable {target} was not found in function");
             return;
         }
 
         if (count > 1)
         {
-            Console.WriteLine($"Error: Variable {target} was found more than once");
+            log.Error($"Variable {target} was found more than once");
             return;
         }
 
@@ -1027,8 +1028,7 @@ public static class Program
 
     private static void HandleException(Exception e)
     {
-        Console.WriteLine("Error: " + (string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message));
-        Debug.WriteLine(e);
+        log.Error(string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message, e);
     }
 
     #endregion

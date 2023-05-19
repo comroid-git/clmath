@@ -10,6 +10,11 @@ public static class TestUtil
     public const int Repeat = 1000;
     public const double Delta = 0.000_000_000_1d;
     public static readonly Random RNG = new();
+    
+    static TestUtil()
+    {
+        Program.log.Level = LogLevel.None;
+    }
 
     public static UnitValue CalcTest(string input)
     {

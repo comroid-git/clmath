@@ -79,7 +79,7 @@ public sealed class Graph : IDisposable
             if (key == null)
             {
                 key = vars[0];
-                Console.WriteLine($"Warning: No variable is unset; falling back to {key}");
+                Program.log.Warning($"No variable is unset; falling back to {key}");
             }
 
             ctx[i][key] = x[i] = new Component { type = Component.Type.Num, arg = (double)0 };
