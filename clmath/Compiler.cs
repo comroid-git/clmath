@@ -9,11 +9,24 @@ public class MathCompiler : MathBaseVisitor<Component>
 {
     public new IEnumerable<Component> VisitUnitFile(MathParser.UnitFileContext unit) => unit.equation().Select(Visit);
 
-    public override Component VisitEquation(MathParser.EquationContext context) => new()
+    public override Component VisitNormalEquation(MathParser.NormalEquationContext context) => new()
     {
         type = Component.Type.Equation,
         x = Visit(context.lhs),
         y = Visit(context.rhs)
+    };
+
+    public override Component VisitVariableDeclaration(MathParser.VariableDeclarationContext context) => new()
+    {
+        type = Component.Type.Declaration,
+        arg = context.lhs.GetText(),
+        x = Visit(context.rhs)
+    };
+
+    public override Component VisitVariableTarget(MathParser.VariableTargetContext context) => new()
+    {
+        type = Component.Type.Target,
+        arg = context.lhs.GetText()
     };
 
     public override Component VisitExprUnit(MathParser.ExprUnitContext context) => new()
@@ -216,7 +229,9 @@ public sealed class Component
         Mem,
         Parentheses,
         Unit,
-        Equation
+        Equation,
+        Declaration,
+        Target
     }
 
     public Type type { get; set; }
@@ -304,7 +319,7 @@ public sealed class Component
                 case (Type.Eval, _, _):
                     if (Program.LoadFunc(arg!.ToString()!) is not { } res)
                         return double.NaN;
-                    var subCtx = new MathContext(res);
+                    var subCtx = new MathContext(res, null);
                     foreach (var (key, value) in ctx!.Vars())
                         subCtx[key] = value;
                     foreach (var var in args)

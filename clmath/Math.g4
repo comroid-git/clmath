@@ -105,7 +105,12 @@ expr
     | expr castKeyword unit=word    #exprUnitCast
     | expr QUESTION                 #exprUnitNormalize
 ;
-equation: lhs=expr EQUALS rhs=expr SEMICOLON?;
+equation
+    : lhs=expr EQUALS rhs=expr SEMICOLON?       #normalEquation
+    | lhs=word EQUALS rhs=expr SEMICOLON?       #variableDeclaration
+    | lhs=word EQUALS rhs=QUESTION SEMICOLON?   #variableTarget
+;
+input: expr | equation;
 unitFile: .*? equation*;
 
 WS: [ \r\n\t] -> channel(HIDDEN);

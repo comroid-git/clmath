@@ -3,9 +3,10 @@
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyVersion>1.3</AssemblyVersion>
+        <AssemblyVersion>2.0</AssemblyVersion>
         <FileVersion>10</FileVersion>
         <NeutralLanguage>en-150</NeutralLanguage>
+        <InformationalVersion>$(AssemblyVersion)</InformationalVersion>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>..\icon.ico</ApplicationIcon>
         <LangVersion>preview</LangVersion>
@@ -14,15 +15,18 @@
         <SelfContained>false</SelfContained>
         <TargetFramework>net6.0</TargetFramework>
         <IsPackable>false</IsPackable>
+        <PackageId />
+        <Version />
+        <Authors />
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1"/>
-        <PackageReference Include="Antlr4BuildTasks" Version="12.2.0" PrivateAssets="all"/>
-        <PackageReference Include="CommandLineParser" Version="2.9.1"/>
-        <PackageReference Include="Silk.NET.Input" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0"/>
-        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0"/>
+        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
+        <PackageReference Include="Antlr4BuildTasks" Version="12.2.0" PrivateAssets="all" />
+        <PackageReference Include="CommandLineParser" Version="2.9.1" />
+        <PackageReference Include="Silk.NET.Input" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.OpenGL" Version="2.16.0" />
+        <PackageReference Include="Silk.NET.Windowing" Version="2.16.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -49,11 +53,11 @@
     </ItemGroup>
 
     <ItemGroup Condition="Exists('..\..\csapi\common\common.csproj')">
-        <ProjectReference Include="..\..\csapi\common\common.csproj"/>
+        <ProjectReference Include="..\..\csapi\common\common.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition="!Exists('..\..\csapi\common\common.csproj')">
-        <PackageReference Include="comroid.csapi.common" Version="0.1.0"/>
+        <PackageReference Include="comroid.csapi.common" Version="0.1.0" />
     </ItemGroup>
 
 </Project>
