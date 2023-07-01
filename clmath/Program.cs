@@ -213,7 +213,7 @@ public static class Program
             EditCommand.TargetType.config => cmd.Value,
             _ => string.Empty
         };
-        EditMode();
+        //EditMode();
     }
 
     private static void HandleGetConfig(GetCommand cmd)
@@ -288,7 +288,7 @@ public static class Program
                 var entry = Config.Entries[name3];
                 if (!entry.Type.IsArray || !typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
                     throw new Exception("Variable is not string[]");
-                Current.EnabledUnitPacks.Add(value3);
+                //Current.EnabledUnitPacks.Add(value3);
                 SaveConfig();
                 break;
         }
@@ -312,7 +312,7 @@ public static class Program
                 var entry = Config.Entries[name3];
                 if (!entry.Type.IsArray || typeof(string).IsAssignableFrom(entry.Type.GetElementType()))
                     throw new Exception("Variable is not string[]");
-                Current.EnabledUnitPacks.Remove(value3);
+                //Current.EnabledUnitPacks.Remove(value3);
                 SaveConfig();
                 break;
         }
@@ -340,8 +340,8 @@ public static class Program
     private static void HandleLoad(LoadCommand cmd)
     {
         var ctx = LoadFunc(cmd.Target)!;
-        BaseContext.Function = ctx.function;
-        EvalMode();
+        BaseContext.function = ctx.function;
+        //EvalMode();
     }
 
     private static void HandleSave(SaveCommand cmd)
