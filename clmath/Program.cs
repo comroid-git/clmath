@@ -1029,6 +1029,7 @@ public static class Program
     private static void HandleException(Exception e)
     {
         log.Error(string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message, e);
+        log.Warning("Please report errors at https://github.com/comroid-git/clmath/issues");
     }
 
     #endregion
