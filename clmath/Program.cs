@@ -20,6 +20,8 @@ public static class Program
     
     public static void Main(params string[] args)
     {
+        BigotryFilter.Init();
+
         ParseInput(string.Join(" ", args), new Dictionary<Type, Action<ICmd>>
         {
             { typeof(EditCommand), cmd => HandleEditConfig((EditCommand)cmd) },
